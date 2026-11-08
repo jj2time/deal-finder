@@ -8,10 +8,13 @@ every common investment strategy, and ranks them in a dashboard on your Mac.
 Type any UK postcode or district (e.g. `BS5 6HN` or `M14`), pick a radius, price range, bedrooms and property
 types, and tick the deal types you want — BMV, Repossession, Short lease, Probate, Auction, Cash only,
 Refurb / BRRR, Flip, HMO potential, Motivated seller, Negative equity, Lease option, Strong BTL, Problem property,
-Title split, Conversion, Serviced accommodation. Press **Search**: Deal Finder sends the matching Rightmove (and
-Zoopla) search to your Apify scrapers, values every property against Land Registry sold prices nearby, and shows
-the ones that match your ticks, best first. The first search of an area takes 1–3 minutes (the scraper fetches the
-listings live); changing the ticks afterwards, or repeating the search within 12 hours, is instant.
+Title split, Conversion, Serviced accommodation. Press **Search**: Deal Finder reads Rightmove's results for that
+area (free, built in — or through a paid Apify scraper if you add one), values every property against Land Registry
+sold prices nearby, and shows the ones that match your ticks, best first. A search takes about a minute; changing
+the ticks afterwards, or repeating the search within 12 hours, is instant.
+
+**Send to Deal Finder button.** Drag the button on the search page to your bookmarks bar. While you browse
+Rightmove yourself, click it on any results page and every listing on that page is analysed in Deal Finder.
 **Save search** re-runs it every day and emails you new high-scoring deals.
 
 **What it does on every search or scan**
@@ -51,7 +54,13 @@ To rebuild the zip from this repo: `macos/build_app.sh` → `dist/DealFinder-mac
 
 ## Settings page
 
-**1. Rightmove and Zoopla (Apify).** Create an account at apify.com and paste your API token. In the Apify Store,
+**1. Free Rightmove reader** (on by default). Reads Rightmove's ordinary results pages for each search — up to
+3 pages (72 listings) with a pause of a few seconds between pages — and opens leasehold properties' own pages to
+find lease lengths. It identifies itself honestly and does nothing to get round Rightmove's protections: if
+Rightmove limits it, it stops and tells you. This is against Rightmove's terms of use, and Rightmove could
+temporarily limit your home connection; keep searches modest and use the email-alert backup.
+
+**Optional: Apify (paid; the only way to add Zoopla).** Create an account at apify.com and paste your API token. In the Apify Store,
 search "Rightmove" (and "Zoopla" if you want both), pick a scraper with good recent reviews **that accepts search
 result page URLs**, and paste its ID (from the page address, e.g. `someone/rightmove-scraper`). Deal Finder sends
 it `{"startUrls": [{"url": "<the Rightmove search link>"}], "maxItems": 100}`; if your scraper names its inputs
@@ -90,6 +99,13 @@ python -m dealfinder run --open
 ```
 
 ## Checking the numbers
+
+BMV compares the asking price with the median sold price of the same property type nearby. Two safeguards:
+student pods, shared-ownership shares, retirement flats, garages/plots, park homes and ground-rent investments
+are never flagged as BMV (they sell far below ordinary homes, so the comparison is meaningless), and auction
+lots are labelled "auction guide price" and count for half in the score, because guide prices are set low on
+purpose.
+
 
 Every assumption — mortgage rate, LTV, running costs, refurb £/m², BMV threshold — is on the Settings page;
 stamp duty bands are in `config.yaml`. **Stamp duty bands are England's residential rates as of 2025; check gov.uk before relying on

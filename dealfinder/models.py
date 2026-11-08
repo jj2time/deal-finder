@@ -82,6 +82,8 @@ class Analysis:
     brrr_cash_left_in: int | None = None
     sales_history: list[dict[str, Any]] = field(default_factory=list)
     negative_equity: bool = False
+    comparison_warning: str | None = None   # set when sold-price comparison isn't like-for-like
+    is_auction: bool = False
     strategies: list[StrategyMatch] = field(default_factory=list)
     score: int = 0
     comparables: list[dict[str, Any]] = field(default_factory=list)

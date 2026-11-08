@@ -18,6 +18,7 @@ from .models import Listing
 from .search import Search, rightmove_location_id, rightmove_url, zoopla_url
 from .sources.apify import ApifySource, run_actor
 from .sources.csv_import import CsvImportSource
+from .sources.rightmove import RightmoveError, RightmoveReader
 from .sources.email_alerts import EmailAlertSource
 
 log = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ def search_filter(s: Search) -> Callable[[Listing], bool]:
 
 class Scanner:
     def __init__(self, cfg: dict, db: DB | None = None, http=None, land_registry=None, postcodes=None,
-                 propertydata=None, sources=None, apify_runner=None):
+                 propertydata=None, sources=None, apify_runner=None, rightmove_reader=None):
         self.cfg = cfg
         self.db = db or DB(cfg["database"])
         cache_path = str(Path(cfg["database"]).with_name("http_cache.sqlite3"))
@@ -73,6 +74,7 @@ class Scanner:
         self.pd = propertydata or PropertyData(self.http)
         self.sources = sources if sources is not None else self._build_sources()
         self.apify_runner = apify_runner or (lambda actor, inp: run_actor(self.http, actor, inp))
+        self._rightmove_reader = rightmove_reader
         self.progress: Callable[[str], None] = lambda msg: None
 
     def _build_sources(self):
@@ -166,29 +168,48 @@ class Scanner:
             return True
         return datetime.now(timezone.utc) - datetime.fromisoformat(last) > REFETCH_AFTER
 
+    def rightmove_reader(self) -> RightmoveReader:
+        if self._rightmove_reader is None:
+            rcfg = (self.cfg.get("sources") or {}).get("rightmove") or {}
+            self._rightmove_reader = RightmoveReader(max_pages=rcfg.get("max_pages", 3),
+                                                     details=rcfg.get("details", "leasehold"))
+        return self._rightmove_reader
+
     def run_search(self, s: Search) -> dict:
         if not s.area:
             raise SearchError("Type a postcode or postcode district, e.g. BS5 6HN or M14.")
         if not self.pc.locate(s.area if s.is_full_postcode else None, None if s.is_full_postcode else s.area):
             raise SearchError(f"“{s.area}” isn't a UK postcode or postcode district we can find.")
-        if not env("APIFY_TOKEN"):
-            raise SearchError("Add your Apify token in Settings to search Rightmove and Zoopla.")
-        inputs = self.portal_inputs(s)
-        if not inputs:
-            raise SearchError("Add a Rightmove and/or Zoopla scraper ID in Settings.")
+        free_rm = ((self.cfg.get("sources") or {}).get("rightmove") or {}).get("enabled", True)
+        acfg = (self.cfg.get("sources") or {}).get("apify") or {}
+        use_apify = bool(acfg.get("rightmove_actor_id") or acfg.get("zoopla_actor_id"))
+        if use_apify and not env("APIFY_TOKEN"):
+            raise SearchError("Add your Apify token in Settings, or clear the Apify scraper IDs to use the free reader.")
+        if not free_rm and not use_apify:
+            raise SearchError("Turn on the free Rightmove reader in Settings, or add an Apify scraper.")
+
         listings: list[Listing] = []
         errors = []
-        for portal, actor, inp in inputs:
-            self.progress(f"Fetching listings from {portal} (this usually takes 1–3 minutes)…")
+        if free_rm and not acfg.get("rightmove_actor_id"):
+            loc_id = rightmove_location_id(self.http, s.area)
+            if not loc_id:
+                raise SearchError(f"Rightmove doesn't recognise “{s.area}”. Check the postcode.")
             try:
-                found = self.apify_runner(actor, inp)
-                log.info("%s: %d listings", portal, len(found))
-                listings.extend(found)
-            except Exception as e:
-                log.error("%s scraper failed: %s", portal, e)
-                errors.append(f"{portal}: {e}")
+                listings.extend(self.rightmove_reader().search(rightmove_url(loc_id, s), self.progress))
+            except RightmoveError as e:
+                errors.append(f"Rightmove: {e}")
+        if use_apify:
+            for portal, actor, inp in self.portal_inputs(s):
+                self.progress(f"Fetching listings from {portal} via Apify (usually 1–3 minutes)…")
+                try:
+                    found = self.apify_runner(actor, inp)
+                    log.info("%s: %d listings", portal, len(found))
+                    listings.extend(found)
+                except Exception as e:
+                    log.error("%s scraper failed: %s", portal, e)
+                    errors.append(f"{portal}: {e}")
         if errors and not listings:
-            raise SearchError("The scraper didn't return any listings. " + "; ".join(errors))
+            raise SearchError(" ".join(errors))
         stats = self.process(listings, search_filter(s))
         stats["errors"] = errors
         self.db.mark_fetched(s.fetch_key, s.to_dict(), stats["fetched"])

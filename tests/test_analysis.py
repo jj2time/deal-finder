@@ -57,3 +57,26 @@ def test_repossession_probate(cfg):
     a = analyse(listing(description="Repossession. Sold on behalf of the executor. Probate granted."), [],
                 cfg, today=TODAY)
     assert {"Repossession", "Probate"} <= names(a)
+
+
+def test_unlike_for_like_is_not_bmv(cfg):
+    for desc, addr in [("Student pod investment, 8% yield", "Queensland Place, L7"),
+                       ("A 40% share under shared ownership", "Some Road, BS5"),
+                       ("Retirement apartment for the over 60s", "Court, BS5"),
+                       ("Fully let room", "230 Queensland Place, Cluster 43, Liverpool, L7 3HD")]:
+        a = analyse(listing(description=desc, address=addr, price=20000), comps(10, 160000), cfg, today=TODAY)
+        assert a.bmv_pct is not None and a.comparison_warning and "BMV" not in names(a), desc
+        assert a.score < 20
+
+
+def test_auction_bmv_counts_half(cfg):
+    plain = analyse(listing(description="Nice house"), comps(10, 160000), cfg, today=TODAY)
+    auction = analyse(listing(description="Nice house", is_auction=True), comps(10, 160000), cfg, today=TODAY)
+    assert "BMV" in names(auction) and "guide price" in next(s.reason for s in auction.strategies if s.name == "BMV")
+    assert auction.score < plain.score
+    assert any("guide price" in n for n in auction.notes)
+
+
+def test_leasehold_without_length_is_noted(cfg):
+    a = analyse(listing(tenure="leasehold", description="Flat"), [], cfg, today=TODAY)
+    assert any("lease length isn't stated" in n for n in a.notes)

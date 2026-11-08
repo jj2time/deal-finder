@@ -18,14 +18,15 @@ def home(tmp_path, monkeypatch):
 
 def test_settings_save_and_keep_secrets(home):
     client = TestClient(create_app(config.load_config()))
-    assert "Welcome" in client.get("/").text
+    assert "Send to Deal Finder" in client.get("/").text
     page = client.get("/settings")
     assert page.status_code == 200 and "Apify API token" in page.text
 
     form = {"env_APIFY_TOKEN": "apify_api_secret123",
             "rightmove_actor_id": "someone/rightmove-scraper", "zoopla_actor_id": "other/zoopla",
             "apify_max_items": "50", "apify_extra": '{"proxy": {"useApifyProxy": true}}', "districts": "bs5, m14", "min_price": "50000", "max_price": "200000",
-            "min_bedrooms": "2", "type_terraced": "on", "type_flat": "on", "mortgage_rate_pct": "6",
+            "min_bedrooms": "2", "type_terraced": "on", "rightmove_enabled": "on", "rightmove_max_pages": "5",
+            "rightmove_details": "all", "type_flat": "on", "mortgage_rate_pct": "6",
             "daily_at": "08:15", "env_ALERTS_IMAP_HOST": "imap.gmail.com"}
     r = client.post("/settings", data=form, follow_redirects=False)
     assert r.status_code == 303 and "saved=1" in r.headers["location"]
@@ -37,6 +38,7 @@ def test_settings_save_and_keep_secrets(home):
     assert ap["rightmove_actor_id"] == "someone/rightmove-scraper" and ap["zoopla_actor_id"] == "other/zoopla"
     assert ap["max_items"] == 50 and ap["extra_input"] == {"proxy": {"useApifyProxy": True}}
     assert cfg["finance"]["mortgage_rate_pct"] == 6
+    assert cfg["sources"]["rightmove"] == {"enabled": True, "max_pages": 5, "details": "all"}
     assert cfg["schedule"]["daily_at"] == "08:15" and cfg["database"] == "data/dealfinder.sqlite3"
     assert os.environ["APIFY_TOKEN"] == "apify_api_secret123"
 

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Importing · Deal Finder{% endblock %}
+{% block content %}
+<div class="card progress" id="box"><div class="spinner"></div><div><b>Sending the listings to Deal Finder…</b></div></div>
+<script>
+  (async () => {
+    const box = document.getElementById('box');
+    const fail = (m) => { box.className = 'card warn'; box.textContent = m; };
+    let payload;
+    try { payload = JSON.parse(decodeURIComponent(location.hash.slice(1))); }
+    catch (e) { return fail("Nothing to import. Use the Send to Deal Finder button on a Rightmove search results page."); }
+    history.replaceState(null, '', '/import/browser');
+    const r = await fetch('/import/browser', {method: 'POST', headers: {'Content-Type': 'application/json'},
+                                              body: JSON.stringify(payload)});
+    const body = await r.json();
+    if (!r.ok) return fail(body.error || 'Import failed.');
+    location.href = body.redirect;
+  })();
+</script>
+{% endblock %}

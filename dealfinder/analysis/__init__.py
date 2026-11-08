@@ -7,6 +7,7 @@ from datetime import date
 from ..models import Analysis, Comparable, Listing
 from . import finance
 from .score import deal_score
+from .strategies import unlike_for_like
 from .sdlt import stamp_duty
 from .strategies import match_strategies
 from .valuation import value_from_comps
@@ -62,6 +63,17 @@ def analyse(listing: Listing, comps: list[Comparable], cfg: dict,
     if a.market_value:
         a.bmv_amount = a.market_value - price
         a.bmv_pct = round(a.bmv_amount / a.market_value * 100, 1)
+    a.is_auction = listing.is_auction
+    kind = unlike_for_like(f"{listing.description} {listing.address or ''}".lower())
+    if kind:
+        a.comparison_warning = (f"Looks like {kind}, which sells for much less than ordinary homes nearby — "
+                                "the BMV figure isn't meaningful.")
+        a.notes.append(a.comparison_warning)
+    elif listing.is_auction and a.bmv_pct is not None:
+        a.notes.append("Auction: the asking price is a guide price, set low to attract bidders. "
+                       "Lots usually sell above guide, so the real discount is smaller.")
+    if (listing.tenure or "") == "leasehold" and not listing.lease_years:
+        a.notes.append("Leasehold, but the lease length isn't stated — ask the agent before going further.")
 
     if listing.floor_area_sqm:
         a.price_per_sqm = round(price / listing.floor_area_sqm)

@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import secrets
 import threading
 from datetime import date
 from pathlib import Path
@@ -68,6 +69,10 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
         except ValueError:
             errors.append("Extra scraper options must be JSON like {\"key\": \"value\"}.")
     apify["runs"] = []   # replaced by area searches
+    rm = src.setdefault("rightmove", {})
+    rm["enabled"] = bool(form.get("rightmove_enabled"))
+    rm["max_pages"] = min(max(_num(form.get("rightmove_max_pages"), int) or 3, 1), 10)
+    rm["details"] = form.get("rightmove_details") if form.get("rightmove_details") in ("none", "leasehold", "all") else "leasehold"
     src.setdefault("email_alerts", {"folder": "INBOX", "days_back": 3})["enabled"] = bool(form.get("email_enabled"))
     src.setdefault("csv_import", {"folder": "imports"})["enabled"] = True
 
@@ -95,10 +100,19 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
     return errors
 
 
+BOOKMARKLET_JS = r"""(async()=>{const D='%s';let d;try{const t=await (await fetch(location.href,{credentials:'include'})).text();const m=t.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);d=JSON.parse(m[1]).props.pageProps.searchResults.properties;}catch(e){}if(!d||!d.length){alert('Deal Finder: open a Rightmove search results page first, then click this again.');return;}const items=d.map(p=>({id:p.id,displayAddress:p.displayAddress,price:p.price&&p.price.amount,propertySubType:p.propertySubType,bedrooms:p.bedrooms,summary:p.summary,keyFeatures:(p.keyFeatures||[]).map(k=>k.description||k),location:p.location,propertyUrl:p.propertyUrl,propertyTypeFullDescription:p.propertyTypeFullDescription,firstVisibleDate:p.firstVisibleDate,addedOrReduced:p.addedOrReduced,tenure:p.tenure&&p.tenure.tenureType,displaySize:p.displaySize,auction:p.auction,image:p.propertyImages&&p.propertyImages.mainImageSrc}));window.open(D+'/import/browser#'+encodeURIComponent(JSON.stringify({items})),'_blank');})();"""
+
+
+def bookmarklet(base_url: str) -> str:
+    from urllib.parse import quote
+    return "javascript:" + quote(BOOKMARKLET_JS % base_url, safe="(){}[];:,.=>!&|'+/?*-_")
+
+
 def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     state = {"cfg": cfg or load_config()}
     db = DB(state["cfg"]["database"])
     app = FastAPI(title="Deal Finder")
+    imports: dict[str, set[str]] = {}
     scan_state = {"running": False, "last": None, "error": None, "query": None, "label": "", "progress": ""}
 
     def ctx(request, **kw):
@@ -124,19 +138,27 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         return Search.from_params(qp.get, qp.getlist)
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request, msg: str = ""):
+    def index(request: Request, msg: str = "", batch: str = ""):
         s = current_search(request)
         items = db.results()
-        centre = locate(s)
-        shown = [it for it in items if matches(it, s, centre)] if s.area else []
+        batch_keys = imports.get(batch)
+        if batch_keys is not None:
+            centre = None
+            shown = [it for it in items if it["listing"]["key"] in batch_keys and
+                     (not s.deals or {m["name"] for m in it["analysis"]["strategies"]} & set(s.deals))]
+        else:
+            centre = locate(s)
+            shown = [it for it in items if matches(it, s, centre)] if s.area else []
         shown.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
         counts = {name: sum(1 for it in shown if name in {m["name"] for m in it["analysis"]["strategies"]})
                   for name in STRATEGIES}
         points = [{"lat": it["listing"]["lat"], "lon": it["listing"]["lon"], "key": it["listing"]["key"],
                    "label": f"{it['listing'].get('address')} — {it['analysis']['score']}"}
                   for it in shown if it["listing"].get("lat") and it["listing"].get("lon")]
-        acfg = state["cfg"].get("sources", {}).get("apify") or {}
-        needs_setup = not env("APIFY_TOKEN") or not (acfg.get("rightmove_actor_id") or acfg.get("zoopla_actor_id"))
+        srcs = state["cfg"].get("sources", {})
+        acfg = srcs.get("apify") or {}
+        free_on = (srcs.get("rightmove") or {}).get("enabled", True)
+        needs_setup = not free_on and not (env("APIFY_TOKEN") and (acfg.get("rightmove_actor_id") or acfg.get("zoopla_actor_id")))
         last = db.last_fetched(s.fetch_key) if s.area else None
         return TEMPLATES.TemplateResponse(request, "index.html", ctx(
             request, s=s, items=shown, total=len(items), strategies=STRATEGIES, counts=counts,
@@ -144,7 +166,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == s.query_string(),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
-            query=s.query_string()))
+            query=s.query_string(), batch=batch if batch_keys is not None else "",
+            batch_count=len(batch_keys or []), bookmarklet=bookmarklet(str(request.base_url).rstrip("/"))))
 
     @app.post("/search")
     async def run_search(request: Request):
@@ -159,6 +182,32 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             return RedirectResponse(f"/?{q}", status_code=303)
         start_job(lambda sc: sc.run_search(s), q, f"Searching {s.describe()}")
         return RedirectResponse(f"/?{q}", status_code=303)
+
+    @app.get("/import/browser", response_class=HTMLResponse)
+    def import_browser_page(request: Request):
+        return TEMPLATES.TemplateResponse(request, "import.html", ctx(request))
+
+    @app.post("/import/browser")
+    async def import_browser(request: Request):
+        """Listings sent from the Rightmove page you're looking at (the Send to Deal Finder button)."""
+        from ..sources.rightmove import map_property
+        try:
+            body = await request.json()
+            items = body.get("items") or []
+        except Exception:
+            return JSONResponse({"error": "That didn't look like Rightmove listings."}, status_code=400)
+        listings = [l for l in (map_property(i) for i in items if isinstance(i, dict)) if l]
+        if not listings:
+            return JSONResponse({"error": "No listings found on that page. Open a Rightmove search results page "
+                                          "and try again."}, status_code=400)
+        batch_id = secrets.token_hex(4)
+        imports[batch_id] = {l.key for l in listings}
+        started = start_job(lambda sc: sc.process(listings, lambda l: True), f"batch={batch_id}",
+                            f"Analysing {len(listings)} listings from your browser")
+        if not started:
+            return JSONResponse({"error": "Deal Finder is busy with another search. Try again in a minute."},
+                                status_code=409)
+        return JSONResponse({"redirect": f"/?batch={batch_id}"})
 
     @app.post("/search/save")
     async def save_search(request: Request):

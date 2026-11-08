@@ -6,8 +6,24 @@
 {% for e in errors %}<div class="card warn">{{ e }}</div>{% endfor %}
 <form method="post" action="/settings" autocomplete="off">
 
-<div class="card"><h3>1. Rightmove and Zoopla (via Apify)</h3>
-  <p class="muted">The search page sends your postcode searches to Apify, which fetches the listings from Rightmove and Zoopla.</p>
+<div class="card"><h3>1. Free Rightmove reader</h3>
+  <p class="muted">Reads Rightmove's ordinary search pages for each postcode search, slowly (a pause of a few seconds between pages), the way your browser would. It's free. It is against Rightmove's terms of use, and if Rightmove limits it, it stops and tells you; it never tries to get round that.</p>
+  <label class="check"><input type="checkbox" name="rightmove_enabled" {% if cfg.sources.rightmove is not defined or cfg.sources.rightmove.enabled %}checked{% endif %}> Use the free Rightmove reader</label>
+  <div class="form">
+    <label>Results pages per search <span class="muted">(24 listings each)</span>
+      <select name="rightmove_max_pages">{% for n in [1,2,3,5,10] %}<option value="{{ n }}" {% if (cfg.sources.rightmove.max_pages if cfg.sources.rightmove is defined else 3) == n %}selected{% endif %}>{{ n }} ({{ n * 24 }} listings)</option>{% endfor %}</select></label>
+    <label>Open each property's own page for
+      {% set det = cfg.sources.rightmove.details if cfg.sources.rightmove is defined else 'leasehold' %}
+      <select name="rightmove_details">
+        <option value="leasehold" {% if det == 'leasehold' %}selected{% endif %}>Leaseholds only (finds short leases) — recommended</option>
+        <option value="all" {% if det == 'all' %}selected{% endif %}>All properties (full descriptions; slower)</option>
+        <option value="none" {% if det == 'none' %}selected{% endif %}>None (fastest)</option>
+      </select></label>
+  </div>
+</div>
+
+<div class="card"><h3>Optional: Apify scrapers (paid; also the only way to add Zoopla)</h3>
+  <p class="muted">If you add a Rightmove scraper here, searches use it instead of the free reader. Leave both IDs empty to use the free reader.</p>
   <ol class="muted small">
     <li>Create a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener">apify.com</a>.</li>
     <li>Copy your API token from <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noopener">Settings → API &amp; Integrations</a> and paste it below.</li>

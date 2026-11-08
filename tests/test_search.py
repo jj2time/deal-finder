@@ -93,11 +93,17 @@ def fake_listings(n=3, outcode="BS5"):
             for i in range(n)]
 
 
+class NoNetworkReader:
+    def search(self, url, progress=None):
+        raise AssertionError("tests must not reach Rightmove")
+
+
 def make_scanner(cfg, calls, listings=None, rm_id="POSTCODE^1"):
     cfg["sources"]["apify"]["rightmove_actor_id"] = "someone/rightmove-scraper"
     s = Scanner(cfg, http=FakeHTTP({"matches": [{"id": "1", "type": "POSTCODE", "displayName": "BS5 6AA"}]}),
                 land_registry=FakeLR(), postcodes=FakePostcodes(), propertydata=FakePD(), sources=[],
-                apify_runner=lambda actor, inp: calls.append((actor, inp)) or (listings or fake_listings()))
+                apify_runner=lambda actor, inp: calls.append((actor, inp)) or (listings or fake_listings()),
+                rightmove_reader=NoNetworkReader())
     return s
 
 
@@ -127,11 +133,12 @@ def test_run_search_errors(cfg, token, monkeypatch):
     with pytest.raises(SearchError, match="isn't a UK postcode"):
         sc.run_search(Search(area="ZZ99 9ZZ"))
     sc.pc = FakePostcodes()
-    cfg["sources"]["apify"]["rightmove_actor_id"] = ""
-    with pytest.raises(SearchError, match="scraper ID"):
-        sc.run_search(Search(area="BS5"))
     monkeypatch.delenv("APIFY_TOKEN")
     with pytest.raises(SearchError, match="Apify token"):
+        sc.run_search(Search(area="BS5"))
+    cfg["sources"]["apify"]["rightmove_actor_id"] = ""
+    cfg["sources"]["rightmove"]["enabled"] = False
+    with pytest.raises(SearchError, match="free Rightmove reader"):
         sc.run_search(Search(area="BS5"))
 
 
@@ -165,7 +172,7 @@ def test_search_page_flow(tmp_path, monkeypatch, cfg, token):
         real_init(self, cfg, db=db, http=FakeHTTP({"matches": [{"id": "1", "type": "POSTCODE",
                                                                 "displayName": "BS5 6AA"}]}),
                   land_registry=FakeLR(), postcodes=FakePostcodes(), propertydata=FakePD(), sources=[],
-                  apify_runner=lambda a, i: fake_listings())
+                  apify_runner=lambda a, i: fake_listings(), rightmove_reader=NoNetworkReader())
     monkeypatch.setattr(pipeline.Scanner, "__init__", init)
 
     page = client.get("/")

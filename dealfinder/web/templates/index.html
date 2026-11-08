@@ -5,13 +5,15 @@
 {% endblock %}
 {% block content %}
 {% if msg %}<div class="card ok">{{ msg }}</div>{% endif %}
-{% if needs_setup %}<div class="card ok"><b>Welcome.</b> Before your first search, open <a href="/settings">Settings</a> and add your Apify token and a Rightmove and/or Zoopla scraper ID (it takes about 5 minutes).</div>{% endif %}
+{% if needs_setup %}<div class="card ok"><b>Welcome.</b> Turn on the free Rightmove reader (or add an Apify scraper) in <a href="/settings">Settings</a> before searching.</div>{% endif %}
+{% if batch %}<div class="card ok"><b>{{ batch_count }} listings from your browser.</b> Tick deal types below and press Search to filter them, or <a href="/">start a new search</a>.</div>{% endif %}
 {% if scan.error and not scan.running %}<div class="card warn">{{ scan.error }}</div>{% endif %}
 
-<form class="card" method="post" action="/search" id="search">
+<form class="card" method="{{ 'get' if batch else 'post' }}" action="{{ '/' if batch else '/search' }}" id="search">
+  {% if batch %}<input type="hidden" name="batch" value="{{ batch }}">{% endif %}
   <div class="searchbar">
     <label class="grow">Postcode or district
-      <input name="area" value="{{ s.area }}" placeholder="e.g. BS5 6HN or M14" autofocus required></label>
+      <input name="area" value="{{ s.area }}" placeholder="e.g. BS5 6HN or M14" autofocus {% if not batch %}required{% endif %}></label>
     <label>Radius
       <select name="radius">{% for r in radii %}<option value="{{ r }}" {% if r == s.radius_miles %}selected{% endif %}>{{ r|string|replace('.0','') }} mile{% if r != 1 %}s{% endif %}</option>{% endfor %}</select></label>
     <label>Min price £<input name="min_price" value="{{ s.min_price or '' }}" size="8" inputmode="numeric"></label>
@@ -49,7 +51,10 @@
 <div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
 {% endif %}
 
-{% if s.area %}
+{% if batch and items %}
+<div class="card resultsbar"><b>{{ items|length }} of {{ batch_count }} sent from your browser{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}</b></div>
+{% endif %}
+{% if s.area and not batch %}
 <div class="card resultsbar">
   <div><b>{{ items|length }} propert{{ 'y' if items|length == 1 else 'ies' }}</b> {{ s.describe() }}{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}
     <br><span class="muted small">{% if last_fetched %}Listings last fetched {{ last_fetched[:16]|replace('T',' ') }} UTC.{% elif not searching %}Not fetched yet — press Search.{% endif %}</span></div>
@@ -65,7 +70,7 @@
 
 {% if points %}<div class="card" id="mapcard"><div id="map"></div></div>{% endif %}
 
-{% if s.area and items %}
+{% if (s.area or batch) and items %}
 <div class="card scroll">
 <table>
   <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Area value</th><th class="num">BMV</th>
@@ -92,6 +97,13 @@
 {% elif s.area and last_fetched and not scan.running %}
 <div class="card muted">No properties match. Try a bigger radius, fewer deal types, or a wider price range.</div>
 {% endif %}
+
+<div class="card">
+  <h3>Send listings from Rightmove yourself</h3>
+  <p class="muted">Drag this button onto your browser's bookmarks bar (in Chrome, press Cmd+Shift+B to show the bar first):
+    <a class="btn" href="{{ bookmarklet }}" onclick="alert('Drag this button to your bookmarks bar, then click it while looking at a Rightmove search results page.'); return false;">Send to Deal Finder</a></p>
+  <p class="muted small">Then search on rightmove.co.uk as usual. On any results page, click <b>Send to Deal Finder</b> in your bookmarks bar and every listing on that page is valued and checked for deal types here. Deal Finder must be open.</p>
+</div>
 
 <div class="card">
   <h3>Saved searches</h3>

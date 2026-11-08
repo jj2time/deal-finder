@@ -12,8 +12,9 @@ def _scale(value: float, lo: float, hi: float) -> float:
 
 def deal_score(a: Analysis) -> int:
     score = 0.0
-    if a.bmv_pct is not None:
-        score += 40 * _scale(a.bmv_pct, 0, 30)
+    if a.bmv_pct is not None and not a.comparison_warning:
+        # An auction guide price is set low on purpose, so its discount counts for half.
+        score += (20 if a.is_auction else 40) * _scale(a.bmv_pct, 0, 30)
     if a.gross_yield_pct is not None:
         score += 25 * _scale(a.gross_yield_pct, 5, 12)
     if a.monthly_cashflow is not None:

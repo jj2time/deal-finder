@@ -51,6 +51,30 @@ KEYWORDS = {
 }
 
 
+# Property kinds that sell far below ordinary homes, so comparing them with nearby sales is misleading.
+UNLIKE_FOR_LIKE = [
+    ("student accommodation", ["student pod", "student accommodation", "student studio", "cluster flat",
+                               "student investment", "purpose built student", "pbsa"]),
+    ("a shared-ownership share", ["shared ownership", "% share", "percent share"]),
+    ("a retirement property", ["retirement", "over 55", "over 60", "over-55", "over-60", "age restricted",
+                               "age-restricted", "sheltered housing", "mccarthy stone", "mccarthy & stone"]),
+    ("a garage, parking space or plot", ["garage only", "parking space", "lock up", "lock-up", "plot of land",
+                                         "land for sale", "building plot"]),
+    ("a park home or houseboat", ["park home", "mobile home", "houseboat", "static caravan"]),
+    ("a ground-rent investment", ["ground rent investment", "freehold ground rent"]),
+    ("a hotel-room or serviced-apartment investment", ["hotel room investment", "aparthotel", "room investment"]),
+]
+
+
+def unlike_for_like(text: str) -> str | None:
+    for kind, words in UNLIKE_FOR_LIKE:
+        if any(w in text for w in words):
+            return kind
+    if re.search(r"\bcluster \d+", text) or (re.search(r"\bpods?\b", text) and "student" in text):
+        return "student accommodation"
+    return None
+
+
 def _has(text: str, group: str) -> str | None:
     for kw in KEYWORDS[group]:
         if kw in text:
@@ -72,8 +96,9 @@ def match_strategies(listing: Listing, a: Analysis, thresholds: dict) -> list[St
     def add(name: str, reason: str) -> None:
         out.append(StrategyMatch(name, reason))
 
-    if a.bmv_pct is not None and a.bmv_pct >= thresholds["bmv_pct"]:
-        add("BMV", f"{a.bmv_pct:.0f}% below the median of {a.valuation_comps} nearby sales")
+    if a.bmv_pct is not None and a.bmv_pct >= thresholds["bmv_pct"] and not a.comparison_warning:
+        add("BMV", f"{a.bmv_pct:.0f}% below the median of {a.valuation_comps} nearby sales"
+            + (" (auction guide price)" if listing.is_auction else ""))
 
     if a.gross_yield_pct is not None and a.monthly_cashflow is not None:
         if (a.gross_yield_pct >= thresholds["strong_btl_yield_pct"]
@@ -105,12 +130,15 @@ def match_strategies(listing: Listing, a: Analysis, thresholds: dict) -> list[St
 
     motivated = _has(text, "motivated")
     reductions = listing.raw.get("_price_reductions", 0)
-    if motivated or reductions:
+    portal_reduced = listing.raw.get("_portal_reduced")
+    if motivated or reductions or portal_reduced:
         bits = []
         if motivated:
             bits.append(f'"{motivated}"')
         if reductions:
             bits.append(f"{reductions} price reduction(s) seen")
+        elif portal_reduced:
+            bits.append(str(listing.raw.get("addedOrReduced") or "price reduced"))
         add("Motivated seller", ", ".join(bits))
 
     if kw := _has(text, "probate"):
@@ -129,7 +157,7 @@ def match_strategies(listing: Listing, a: Analysis, thresholds: dict) -> list[St
     if a.negative_equity:
         add("Negative equity", "last recorded sale price is at or above the asking price")
 
-    if a.negative_equity or (a.bmv_pct is not None and a.bmv_pct < 5 and (motivated or reductions)):
+    if a.negative_equity or (a.bmv_pct is not None and a.bmv_pct < 5 and (motivated or reductions or portal_reduced)):
         add("Lease option candidate", "little or no equity and a seller who may want out")
 
     if kw := _has(text, "title_split"):

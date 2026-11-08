@@ -15,7 +15,11 @@ filters:
   min_yield_pct: 0
 
 sources:
-  apify:
+  rightmove:
+    enabled: true             # free built-in reader for Rightmove's search pages
+    max_pages: 3              # 24 listings per page
+    details: leasehold        # open property pages for: none | leasehold | all (lease years + full description)
+  apify:                      # optional paid alternative (and the only way to add Zoopla)
     enabled: true
     # Area searches send Rightmove / Zoopla results-page links to these Apify scrapers.
     # Pick scrapers in the Apify Store that accept search result page URLs; paste their IDs here
