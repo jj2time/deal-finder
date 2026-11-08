@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block header %}
+<span class="muted">{{ items|length }} of {{ total }} deals</span>
+<span style="flex:1"></span>
+{% if scan.running %}<span class="muted">Scanning…</span>{% else %}
+<form method="post" action="/scan" style="margin:0"><button>Scan now</button></form>{% endif %}
+<a class="btn alt" href="/export.csv?strategy={{ strategy|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}&q={{ q|urlencode }}">Export CSV</a>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="filters" method="get">
+    <label>Search<input name="q" value="{{ q }}" placeholder="Address or postcode"></label>
+    <label>Min BMV %<input name="min_bmv" value="{{ min_bmv }}" size="5"></label>
+    <label>Min yield %<input name="min_yield" value="{{ min_yield }}" size="5"></label>
+    <input type="hidden" name="strategy" value="{{ strategy }}">
+    <button>Filter</button>
+  </form>
+  <div class="chips" style="margin-top:10px">
+    <a class="tag {% if not strategy %}on{% endif %}" href="?q={{ q|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}">All</a>
+    {% for s in strategies %}<a class="tag {% if s == strategy %}on{% endif %}" href="?strategy={{ s|urlencode }}&q={{ q|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}">{{ s }}</a>{% endfor %}
+  </div>
+</div>
+{% if points %}<div class="card"><div id="map"></div></div>{% endif %}
+<div class="card scroll">
+{% if not items %}
+  <p class="muted">No deals yet. Set up <code>config.yaml</code> and <code>.env</code>, then press <b>Scan now</b> (or run <code>python -m dealfinder scan</code>).</p>
+{% else %}
+<table>
+  <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Value</th><th class="num">BMV</th>
+  <th class="num">Yield</th><th class="num">Cashflow</th><th>Strategies</th><th>Source</th></tr></thead>
+  <tbody>
+  {% for it in items %}{% set l = it.listing %}{% set a = it.analysis %}
+  <tr>
+    <td><span class="score {% if a.score < 40 %}low{% elif a.score < 65 %}mid{% endif %}">{{ a.score }}</span></td>
+    <td><a href="/deal/{{ l.key }}">{{ l.address or "Unknown address" }}</a><br>
+      <span class="muted">{{ l.bedrooms or "?" }} bed {{ l.property_type }} · {{ l.postcode or l.outcode or "no postcode" }}</span></td>
+    <td class="num">{{ l.price|money }}</td>
+    <td class="num">{{ a.market_value|money }}<br><span class="muted">{{ a.valuation_comps }} sales</span></td>
+    <td class="num">{% if a.bmv_pct is not none %}{{ a.bmv_pct }}%{% else %}—{% endif %}</td>
+    <td class="num">{% if a.gross_yield_pct is not none %}{{ a.gross_yield_pct }}%{% else %}—{% endif %}</td>
+    <td class="num">{{ a.monthly_cashflow|money }}</td>
+    <td>{% for s in a.strategies %}<span class="tag" title="{{ s.reason }}">{{ s.name }}</span>{% endfor %}</td>
+    <td>{% if l.url %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.source }}</a>{% else %}{{ l.source }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</div>
+{% if points %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const pts = {{ points|tojson }};
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© OpenStreetMap contributors'}).addTo(map);
+  const group = L.featureGroup(pts.map(p => L.marker([p.lat, p.lon]).bindPopup(`<a href="/deal/${encodeURI(p.key)}">${p.label}</a>`))).addTo(map);
+  map.fitBounds(group.getBounds().pad(0.2));
+</script>
+{% endif %}
+{% endblock %}

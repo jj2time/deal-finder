@@ -1,0 +1,77 @@
+# Copy to config.yaml and edit. Every number here can be changed without touching code.
+
+database: data/dealfinder.sqlite3
+
+# Where to look. Used to filter listings from every source.
+areas:
+  postcode_districts: [BS5, M14, L4]   # outcodes; leave empty to accept any area
+
+filters:
+  min_price: 40000
+  max_price: 250000
+  property_types: [detached, semi-detached, terraced, flat]   # any of: detached, semi-detached, terraced, flat, other
+  min_bedrooms: 1
+  min_bmv_pct: 0          # hide listings below this BMV % on the dashboard by default
+  min_yield_pct: 0
+
+sources:
+  apify:
+    enabled: true
+    # One entry per saved search. Pick an actor in the Apify Store (search "Rightmove" or "Zoopla"),
+    # copy its ID (looks like username~actor-name) and the input JSON it expects.
+    runs:
+      - name: Rightmove BS5 houses
+        actor_id: "REPLACE-WITH-ACTOR-ID"
+        input:
+          startUrls:
+            - url: "https://www.rightmove.co.uk/property-for-sale/find.html?locationIdentifier=OUTCODE%5E318&maxPrice=250000"
+          maxItems: 100
+  email_alerts:
+    enabled: false
+    folder: INBOX
+    days_back: 3
+  csv_import:
+    enabled: true
+    folder: imports          # drop auction catalogues / any CSV here; see README for columns
+
+valuation:
+  months_back: 24
+  radii_m: [400, 800, 1200, 2000]
+  min_comparables: 8
+
+finance:
+  mortgage_rate_pct: 5.5
+  loan_to_value_pct: 75
+  interest_only: true
+  running_costs_pct: 15        # of rent: management, voids, repairs, insurance
+  legal_and_survey: 2500
+  refurb_per_sqm: 450          # light-medium refurb estimate when floor area is known
+  refurb_default: 20000        # used when floor area is unknown
+  refinance_ltv_pct: 75
+  flip_selling_costs_pct: 3
+  flip_months: 6
+
+stamp_duty:                    # England SDLT, residential. CHECK CURRENT RATES before relying on this.
+  bands:                       # [upper limit of band, rate %]; last band has no limit
+    - [125000, 0]
+    - [250000, 2]
+    - [925000, 5]
+    - [1500000, 10]
+    - [null, 12]
+  additional_property_surcharge_pct: 5
+  non_resident_surcharge_pct: 2
+  surcharge_min_price: 40000
+  buyer_is_non_resident: false
+
+thresholds:
+  bmv_pct: 15                  # counts as BMV at or above this
+  strong_btl_yield_pct: 8
+  strong_btl_cashflow: 200     # £/month
+
+alerts:
+  enabled: false
+  to: you@example.com
+  min_score: 70
+
+schedule:
+  daily_at: "07:30"            # local time the saved searches re-run when using `run`

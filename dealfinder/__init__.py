@@ -1,0 +1,1 @@
+"""UK property deal finder."""

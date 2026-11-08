@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set l = it.listing %}{% set a = it.analysis %}
+{% block title %}{{ l.address or "Deal" }}{% endblock %}
+{% block header %}<span style="flex:1"></span>
+<a class="btn" href="/deal/{{ l.key }}/pack.pdf">Deal pack PDF</a>
+{% if l.url %}<a class="btn alt" href="{{ l.url }}" target="_blank" rel="noopener">Open listing</a>{% endif %}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin:0 0 4px">{{ l.address or "Unknown address" }}</h2>
+  <p class="muted" style="margin:0 0 12px">{{ l.bedrooms or "?" }} bed {{ l.property_type }} · {{ l.postcode or l.outcode or "no postcode" }} · {{ l.source }} · first seen {{ it.first_seen[:10] }}</p>
+  <div class="grid">
+    <div class="stat"><span class="muted">Deal score</span><b>{{ a.score }}/100</b></div>
+    <div class="stat"><span class="muted">Asking price</span><b>{{ l.price|money }}</b></div>
+    <div class="stat"><span class="muted">Market value</span><b>{{ a.market_value|money }}</b><span class="muted">{{ a.valuation_comps }} sales within {{ a.valuation_radius_m or "—" }} m</span></div>
+    <div class="stat"><span class="muted">BMV</span><b>{% if a.bmv_pct is not none %}{{ a.bmv_pct }}% ({{ a.bmv_amount|money }}){% else %}—{% endif %}</b></div>
+    <div class="stat"><span class="muted">Stamp duty (additional)</span><b>{{ a.stamp_duty|money }}</b></div>
+    <div class="stat"><span class="muted">Rent pcm</span><b>{{ a.rent_pcm|money }}</b><span class="muted">{{ a.rent_source or "" }}</span></div>
+    <div class="stat"><span class="muted">Gross yield</span><b>{% if a.gross_yield_pct is not none %}{{ a.gross_yield_pct }}%{% else %}—{% endif %}</b></div>
+    <div class="stat"><span class="muted">Cashflow pcm</span><b>{{ a.monthly_cashflow|money }}</b><span class="muted">mortgage {{ a.monthly_mortgage|money }}</span></div>
+    <div class="stat"><span class="muted">Cash in / ROI</span><b>{{ a.cash_in|money }}</b><span class="muted">{% if a.roi_pct is not none %}{{ a.roi_pct }}% ROI{% endif %}</span></div>
+    <div class="stat"><span class="muted">Refurb estimate</span><b>{{ a.refurb_cost|money }}</b></div>
+    <div class="stat"><span class="muted">Flip profit</span><b>{{ a.flip_profit|money }}</b><span class="muted">end value {{ (a.done_up_value or a.market_value)|money }}</span></div>
+    <div class="stat"><span class="muted">BRRR cash left in</span><b>{{ a.brrr_cash_left_in|money }}</b></div>
+  </div>
+  {% for n in a.notes %}<p class="warn" style="margin:10px 0 0">{{ n }}</p>{% endfor %}
+</div>
+<div class="card"><h3 style="margin-top:0">Strategies</h3>
+  {% if a.strategies %}<table>{% for s in a.strategies %}<tr><td><span class="tag">{{ s.name }}</span></td><td>{{ s.reason }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="muted">No strategy flagged.</p>{% endif %}
+</div>
+{% if a.sales_history or it.price_history|length > 1 %}
+<div class="card"><h3 style="margin-top:0">History</h3>
+  {% if a.sales_history %}<p><b>Previous sales of this address</b>{% if a.negative_equity %} <span class="warn">— possible negative equity</span>{% endif %}</p>
+  <table>{% for s in a.sales_history %}<tr><td>{{ s.date }}</td><td class="num">{{ s.price|money }}</td><td>{{ s.address }}</td></tr>{% endfor %}</table>{% endif %}
+  {% if it.price_history|length > 1 %}<p><b>Asking price changes</b></p>
+  <table>{% for p in it.price_history %}<tr><td>{{ p.seen_at[:10] }}</td><td class="num">{{ p.price|money }}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+{% endif %}
+<div class="card scroll"><h3 style="margin-top:0">Sold-price evidence (HM Land Registry)</h3>
+  {% if a.comparables %}<table><thead><tr><th>Date</th><th>Address</th><th>Type</th><th class="num">Price</th><th class="num">Distance</th></tr></thead>
+  {% for c in a.comparables %}<tr><td>{{ c.date }}</td><td>{{ c.address }} {{ c.postcode }}</td><td>{{ c.property_type }}</td><td class="num">{{ c.price|money }}</td><td class="num">{% if c.distance_m is not none %}{{ c.distance_m|round|int }} m{% else %}—{% endif %}</td></tr>{% endfor %}
+  </table>{% else %}<p class="muted">No comparable sales.</p>{% endif %}
+</div>
+{% if l.description %}<div class="card"><h3 style="margin-top:0">Listing description</h3><p>{{ l.description }}</p></div>{% endif %}
+{% endblock %}
