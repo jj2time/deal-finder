@@ -115,6 +115,9 @@ class ApifySource:
             if actor.startswith("REPLACE"):
                 log.warning("Apify run %r has no actor_id set — skipping.", run.get("name"))
                 continue
+            if "startUrls" in (run.get("input") or {}) and not run["input"]["startUrls"]:
+                log.warning("Apify run %r has no search pages set — skipping.", run.get("name"))
+                continue
             log.info("Running Apify actor %s (%s)…", actor, run.get("name"))
             try:
                 items = self.http.request_json(

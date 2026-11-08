@@ -2,11 +2,16 @@
 {% block header %}
 <span class="muted">{{ items|length }} of {{ total }} deals</span>
 <span style="flex:1"></span>
-{% if scan.running %}<span class="muted">Scanning…</span>{% else %}
+{% if scan.running %}<span class="muted">Scanning… this page refreshes when it's done</span>{% else %}
 <form method="post" action="/scan" style="margin:0"><button>Scan now</button></form>{% endif %}
+<a class="btn alt" href="/settings">Settings</a>
 <a class="btn alt" href="/export.csv?strategy={{ strategy|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}&q={{ q|urlencode }}">Export CSV</a>
 {% endblock %}
 {% block content %}
+{% if msg %}<div class="card ok">{{ msg }}</div>{% endif %}
+{% if scan.error %}<div class="card warn">Last scan failed: {{ scan.error }}</div>{% endif %}
+{% if scan.last and not scan.running %}<div class="card muted">Last scan: {{ scan.last.fetched }} listings found, {{ scan.last.kept }} matched your filters, {{ scan.last.new }} new.</div>{% endif %}
+{% if needs_setup %}<div class="card ok"><b>Welcome.</b> Start in <a href="/settings">Settings</a>: add your Apify token and the Rightmove/Zoopla searches you want scanned, then press <b>Scan now</b>.</div>{% endif %}
 <div class="card">
   <form class="filters" method="get">
     <label>Search<input name="q" value="{{ q }}" placeholder="Address or postcode"></label>
@@ -14,6 +19,10 @@
     <label>Min yield %<input name="min_yield" value="{{ min_yield }}" size="5"></label>
     <input type="hidden" name="strategy" value="{{ strategy }}">
     <button>Filter</button>
+  </form>
+  <form method="post" action="/upload" enctype="multipart/form-data" style="margin-top:10px" class="filters">
+    <label>Import auction catalogue or any list (CSV)<input type="file" name="file" accept=".csv" required></label>
+    <button class="btn alt">Import</button>
   </form>
   <div class="chips" style="margin-top:10px">
     <a class="tag {% if not strategy %}on{% endif %}" href="?q={{ q|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}">All</a>
@@ -57,4 +66,7 @@
   map.fitBounds(group.getBounds().pad(0.2));
 </script>
 {% endif %}
+{% if scan.running %}<script>
+  setInterval(async () => { const r = await fetch('/scan/status'); if (!(await r.json()).running) location.reload(); }, 3000);
+</script>{% endif %}
 {% endblock %}

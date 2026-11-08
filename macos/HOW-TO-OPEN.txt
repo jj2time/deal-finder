@@ -1,0 +1,14 @@
+Deal Finder for Mac
+
+1. Drag "Deal Finder.app" into your Applications folder.
+2. Double-click it. The first time, macOS will say it can't check the app for malicious software,
+   because it isn't from the App Store. Click Done (or OK), then:
+   open System Settings > Privacy & Security, scroll down, and click "Open Anyway" next to Deal Finder.
+   Double-click the app again and click "Open". You only do this once.
+3. The first launch sets itself up (a few minutes, needs internet). Your browser then opens the dashboard.
+4. Click Settings, add your Apify token and your Rightmove/Zoopla searches, save, then press Scan now.
+
+Deal Finder keeps running in the background so it can scan daily. Open the app any time to get back to the
+dashboard, or click Stop on the dashboard to turn it off.
+
+Your settings and deals are saved in: your home folder > Library > Application Support > Deal Finder

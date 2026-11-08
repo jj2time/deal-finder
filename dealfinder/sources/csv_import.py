@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Iterable
 
-from ..config import ROOT
+from ..config import home_path
 from ..data.postcodes import find_outcode, find_postcode
 from ..models import Listing
 from .base import normalise_type, parse_int, parse_price
@@ -56,7 +56,7 @@ class CsvImportSource:
 
     def __init__(self, cfg: dict, http=None):
         folder = Path(cfg.get("folder", "imports"))
-        self.folder = folder if folder.is_absolute() else ROOT / folder
+        self.folder = home_path(folder)
 
     def fetch(self) -> Iterable[Listing]:
         if not self.folder.exists():

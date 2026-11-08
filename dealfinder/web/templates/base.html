@@ -29,11 +29,20 @@
   .stat { border:1px solid var(--line); border-radius:8px; padding:10px; } .stat b { display:block; font-size:18px; }
   footer { padding:16px 24px 30px; color:var(--muted); font-size:12px; text-align:center; }
   .scroll { overflow-x:auto; }
+  h3 { margin:0 0 8px; }
+  .form { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:12px; margin-top:10px; }
+  .form label { display:flex; flex-direction:column; gap:4px; font-size:13px; font-weight:600; }
+  .form .wide { grid-column:1 / -1; } textarea { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; width:100%; }
+  label.check { display:inline-flex; flex-direction:row; align-items:center; gap:6px; font-weight:400; margin-right:14px; }
+  .card.ok { background:#e5f4e4; border-color:#bfe0bd; } .card.warn { background:#fbebeb; border-color:#efc9c9; color:var(--warn); }
+  .ok-text { color:var(--accent); font-weight:400; }
+  header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>
 </head>
 <body>
-<header><h1><a href="/">Deal Finder</a></h1>{% block header %}{% endblock %}</header>
+<header><h1><a href="/">Deal Finder</a></h1>{% block header %}{% endblock %}
+<form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? Daily scans pause until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
 <main>{% block content %}{% endblock %}</main>
 <footer>Estimates only, not financial advice. Contains HM Land Registry data © Crown copyright and database right {{ year }}. This data is licensed under the Open Government Licence v3.0.</footer>
 </body>

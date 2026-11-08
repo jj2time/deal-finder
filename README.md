@@ -21,70 +21,66 @@ every common investment strategy, and ranks them in a dashboard on your Mac.
 Dashboard: ranked table, a filter button per strategy, map, detail page with the sold-price evidence,
 CSV export and a one-click PDF deal pack.
 
-## Setup (once)
+## Getting it on your Mac (no Terminal needed)
 
-You need Python 3.11 or newer. On a Mac, open **Terminal** and run these one at a time:
+1. Download **DealFinder-mac.zip** and double-click it to unzip.
+2. Drag **Deal Finder.app** into your Applications folder and double-click it.
+3. The first time, macOS says it can't check the app, because it isn't from the App Store. Click **Done**, open
+   **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Deal Finder. Open the
+   app again and click **Open**. You only do this once.
+4. The first launch sets itself up (a few minutes, needs internet), then opens the dashboard in your browser.
+5. Click **Settings**, fill it in (below), click **Save settings**, then **Scan now**.
 
-```bash
-cd ~/deal-finder
-```
+Deal Finder keeps running in the background so it can scan every day at the time you choose. Open the app again to
+get back to the dashboard; click **Stop** on the dashboard to turn it off. Your settings and deals are saved in
+`~/Library/Application Support/Deal Finder` (the log file there, `dealfinder.log`, shows what happened if
+something goes wrong).
+
+To rebuild the zip from this repo: `macos/build_app.sh` → `dist/DealFinder-mac.zip`.
+
+## Settings page
+
+**1. Rightmove and Zoopla (Apify).** Create an account at apify.com and paste your API token. In the Apify Store,
+search "Rightmove" (or "Zoopla"), pick a scraper with good recent reviews, and paste its ID (from the page
+address, e.g. `someone/rightmove-scraper`). Then do your searches on rightmove.co.uk / zoopla.co.uk and paste each
+results-page address, one per line. If a scraper needs other options, add them under *Advanced*.
+
+If listings come in without prices or addresses, that scraper uses field names Deal Finder doesn't know yet — add
+them to `FIELD_NAMES` in `dealfinder/sources/apify.py`.
+
+Scraping breaks Rightmove's and Zoopla's terms of use. They can block scrapers or change their site at any time,
+so an Apify scraper can stop working without warning. Keep the email-alert backup on, use it for your own research,
+and don't republish the scraped data.
+
+**2. Areas and filters.** Postcode districts, price range, bedrooms, property types.
+
+**3. Rent estimates.** A PropertyData API key (paid) gives every deal a rent estimate, yield and cashflow. Without
+it, those are left blank rather than guessed.
+
+**4. Your own alert emails (backup, free).** Set up Rightmove / Zoopla / OnTheMarket email alerts to a Gmail
+address, create a Gmail App Password, and enter them here.
+
+**5. Deal alerts.** Emails you any deal above the score you choose.
+
+**6. Deal maths** and **7. Daily scan time.**
+
+**Auctions and other lists:** use **Import** on the dashboard to add a CSV (see `imports/example.csv` for the
+columns), then press **Scan now**.
+
+## Running from Terminal (developers)
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 ```
 
 ```bash
-cp config.example.yaml config.yaml && cp .env.example .env
+python -m dealfinder run --open
 ```
-
-Then open `config.yaml` and `.env` in TextEdit and fill them in (next section).
-
-## Connecting your sources
-
-**Apify (Rightmove / Zoopla).**
-
-1. Create an account at apify.com. Copy your API token from Settings → API & Integrations into `.env` as
-   `APIFY_TOKEN=...`.
-2. In the Apify Store, search "Rightmove" (and/or "Zoopla"). Pick a scraper with good recent reviews and runs.
-3. Open it, copy its ID (looks like `someone~rightmove-scraper`) into `config.yaml` under `sources → apify →
-   runs → actor_id`.
-4. Copy the input it expects into `input:`. Most take Rightmove search URLs: do your search on rightmove.co.uk,
-   copy the address bar, paste it as the `url`.
-5. Run `python -m dealfinder scan`. If listings come in without prices or addresses, open one run's output in the
-   Apify console and tell whoever maintains this which field names it uses (add them in
-   `dealfinder/sources/apify.py`, `FIELD_NAMES`).
-
-Scraping breaks Rightmove's and Zoopla's terms of use. Rightmove can block or change its site at any time, so
-an Apify scraper can stop working without warning. Keep the email-alert source switched on as a backup, use it
-for your own research, and don't republish the scraped data.
-
-**Your own portal alert emails (backup, free).** Make a separate Gmail account, turn on 2-step verification and
-create an App Password. Put `ALERTS_IMAP_HOST=imap.gmail.com`, the address and the App Password in `.env`. Set up
-saved-search email alerts on Rightmove / Zoopla / OnTheMarket to that address, then set
-`email_alerts: enabled: true` in `config.yaml`.
-
-**PropertyData (optional, paid).** Put your key in `.env` as `PROPERTYDATA_API_KEY`. It's used for rent
-estimates, so you get yield and cashflow figures. Without it, those numbers are left blank rather than guessed.
-
-**Auctions and anything else.** Save an auction catalogue (or any list) as CSV into `imports/` — see
-`imports/example.csv` for the columns.
-
-**Email alerts to you.** Fill in `SMTP_*` in `.env` (Gmail: `smtp.gmail.com`, port 587, the App Password),
-then set `alerts: enabled: true` and your address in `config.yaml`.
-
-## Running it
-
-```bash
-source .venv/bin/activate && python -m dealfinder run
-```
-
-Open http://127.0.0.1:8000. Press **Scan now** for an immediate scan. While `run` is open, it scans daily at
-the time in `config.yaml`. To scan once without the dashboard: `python -m dealfinder scan`.
 
 ## Checking the numbers
 
-Every assumption — mortgage rate, LTV, running costs, refurb £/m², BMV threshold, stamp duty bands — is in
-`config.yaml`. **Stamp duty bands are England's residential rates as of 2025; check gov.uk before relying on
+Every assumption — mortgage rate, LTV, running costs, refurb £/m², BMV threshold — is on the Settings page;
+stamp duty bands are in `config.yaml`. **Stamp duty bands are England's residential rates as of 2025; check gov.uk before relying on
 them** (Wales uses Land Transaction Tax, which this doesn't calculate yet).
 
 All figures are estimates to help you shortlist, not advice. Always check the listing, the comparables and the
@@ -98,7 +94,8 @@ python -m pytest
 
 Tests cover stamp duty, finance, valuation, strategy flags, every source's parsing, a full scan with mocked
 APIs, the dashboard, CSV export and the PDF. The live Land Registry, postcodes.io, PropertyData and Apify calls
-haven't been run against the real services yet — the first real scan is the test of those.
+haven't been run against the real services yet — the first real scan is the test of those. The Mac app's
+launcher was tested in a simulation, not on a real Mac.
 
 ## Not built yet
 

@@ -8,3 +8,4 @@ config.yaml
 imports/*.csv
 !imports/example.csv
 .pytest_cache/
+dist/

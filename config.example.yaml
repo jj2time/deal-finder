@@ -4,7 +4,7 @@ database: data/dealfinder.sqlite3
 
 # Where to look. Used to filter listings from every source.
 areas:
-  postcode_districts: [BS5, M14, L4]   # outcodes; leave empty to accept any area
+  postcode_districts: []   # outcodes like BS5, M14; empty = any area
 
 filters:
   min_price: 40000
@@ -23,8 +23,7 @@ sources:
       - name: Rightmove BS5 houses
         actor_id: "REPLACE-WITH-ACTOR-ID"
         input:
-          startUrls:
-            - url: "https://www.rightmove.co.uk/property-for-sale/find.html?locationIdentifier=OUTCODE%5E318&maxPrice=250000"
+          startUrls: []          # e.g. - url: "https://www.rightmove.co.uk/property-for-sale/find.html?..."
           maxItems: 100
   email_alerts:
     enabled: false
@@ -70,7 +69,7 @@ thresholds:
 
 alerts:
   enabled: false
-  to: you@example.com
+  to: ""
   min_score: 70
 
 schedule:

@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Settings · Deal Finder{% endblock %}
+{% block header %}<span class="muted">Settings</span><span style="flex:1"></span><a class="btn alt" href="/">Back to deals</a>{% endblock %}
+{% block content %}
+{% if saved %}<div class="card ok">Saved. Press <b>Scan now</b> on the deals page to use the new settings.</div>{% endif %}
+{% for e in errors %}<div class="card warn">{{ e }}</div>{% endfor %}
+<form method="post" action="/settings" autocomplete="off">
+
+<div class="card"><h3>1. Rightmove and Zoopla (via Apify)</h3>
+  <p class="muted">Create a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener">apify.com</a>.
+  Copy your API token from <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noopener">Settings → API &amp; Integrations</a>.
+  Then, in the <a href="https://apify.com/store?search=rightmove" target="_blank" rel="noopener">Apify Store</a>, pick a Rightmove or Zoopla scraper with good reviews and copy its ID from the page address (it looks like <code>someone/rightmove-scraper</code>).</p>
+  <label class="check"><input type="checkbox" name="apify_enabled" {% if cfg.sources.apify.enabled %}checked{% endif %}> Use Apify</label>
+  <div class="form">
+    <label>Apify API token {% if has_secret.APIFY_TOKEN %}<span class="ok-text">saved ✓ (leave blank to keep)</span>{% endif %}
+      <input type="password" name="env_APIFY_TOKEN" placeholder="apify_api_..."></label>
+    <label>Scraper ID<input name="apify_actor_id" value="{{ apify.actor_id }}" placeholder="someone/rightmove-scraper"></label>
+    <label class="wide">Search pages to scan, one per line
+      <span class="muted">Do your search on rightmove.co.uk or zoopla.co.uk (area, price, type), then copy the page address here.</span>
+      <textarea name="apify_urls" rows="4" placeholder="https://www.rightmove.co.uk/property-for-sale/find.html?...">{{ apify.urls }}</textarea></label>
+    <label>Max listings per scan<input name="apify_max_items" value="{{ apify.max_items }}" size="6"></label>
+    <details class="wide"><summary class="muted">Advanced: extra input for this scraper (JSON)</summary>
+      <textarea name="apify_extra" rows="4" placeholder='{"includeDescription": true}'>{{ apify.extra }}</textarea></details>
+  </div>
+</div>
+
+<div class="card"><h3>2. Areas and filters</h3>
+  <div class="form">
+    <label class="wide">Postcode districts <span class="muted">e.g. BS5, M14, L4. Leave empty for anywhere.</span>
+      <input name="districts" value="{{ cfg.areas.postcode_districts|join(', ') }}"></label>
+    <label>Min price £<input name="min_price" value="{{ cfg.filters.min_price }}"></label>
+    <label>Max price £<input name="max_price" value="{{ cfg.filters.max_price }}"></label>
+    <label>Min bedrooms<input name="min_bedrooms" value="{{ cfg.filters.min_bedrooms }}"></label>
+    <div class="wide">{% for t in types %}<label class="check"><input type="checkbox" name="type_{{ t }}" {% if t in cfg.filters.property_types %}checked{% endif %}> {{ t }}</label>{% endfor %}</div>
+  </div>
+</div>
+
+<div class="card"><h3>3. Rent estimates (optional)</h3>
+  <p class="muted">With a <a href="https://propertydata.co.uk/api" target="_blank" rel="noopener">PropertyData</a> API key (paid), every deal gets a rent estimate, yield and cashflow. Without it, those stay blank.</p>
+  <div class="form"><label>PropertyData API key {% if has_secret.PROPERTYDATA_API_KEY %}<span class="ok-text">saved ✓</span>{% endif %}
+    <input type="password" name="env_PROPERTYDATA_API_KEY"></label></div>
+</div>
+
+<div class="card"><h3>4. Your own Rightmove / Zoopla alert emails (optional backup)</h3>
+  <p class="muted">Set up email alerts on the portals to a Gmail address, create a Gmail <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">App Password</a>, and Deal Finder reads the alerts automatically.</p>
+  <label class="check"><input type="checkbox" name="email_enabled" {% if cfg.sources.email_alerts.enabled %}checked{% endif %}> Read my alert emails</label>
+  <div class="form">
+    <label>Mail server<input name="env_ALERTS_IMAP_HOST" value="{{ keys.ALERTS_IMAP_HOST }}" placeholder="imap.gmail.com"></label>
+    <label>Email address<input name="env_ALERTS_IMAP_USER" value="{{ keys.ALERTS_IMAP_USER }}"></label>
+    <label>App Password {% if has_secret.ALERTS_IMAP_PASSWORD %}<span class="ok-text">saved ✓</span>{% endif %}
+      <input type="password" name="env_ALERTS_IMAP_PASSWORD"></label>
+  </div>
+</div>
+
+<div class="card"><h3>5. Deal alerts to my email (optional)</h3>
+  <label class="check"><input type="checkbox" name="alerts_enabled" {% if cfg.alerts.enabled %}checked{% endif %}> Email me deals that score at least
+    <input name="alerts_min_score" value="{{ cfg.alerts.min_score }}" size="3"></label>
+  <div class="form">
+    <label>Send alerts to<input name="alerts_to" value="{{ cfg.alerts.to }}"></label>
+    <label>Sending server<input name="env_SMTP_HOST" value="{{ keys.SMTP_HOST }}" placeholder="smtp.gmail.com"></label>
+    <label>Port<input name="env_SMTP_PORT" value="{{ keys.SMTP_PORT or '587' }}" size="5"></label>
+    <label>Sending email address<input name="env_SMTP_USER" value="{{ keys.SMTP_USER }}"></label>
+    <label>App Password {% if has_secret.SMTP_PASSWORD %}<span class="ok-text">saved ✓</span>{% endif %}
+      <input type="password" name="env_SMTP_PASSWORD"></label>
+  </div>
+</div>
+
+<div class="card"><h3>6. Deal maths</h3>
+  <div class="form">
+    <label>Mortgage rate %<input name="mortgage_rate_pct" value="{{ cfg.finance.mortgage_rate_pct }}"></label>
+    <label>Loan to value %<input name="loan_to_value_pct" value="{{ cfg.finance.loan_to_value_pct }}"></label>
+    <label>Running costs % of rent<input name="running_costs_pct" value="{{ cfg.finance.running_costs_pct }}"></label>
+    <label>Refurb £ per m²<input name="refurb_per_sqm" value="{{ cfg.finance.refurb_per_sqm }}"></label>
+    <label>Refurb £ if size unknown<input name="refurb_default" value="{{ cfg.finance.refurb_default }}"></label>
+    <label>Counts as BMV from %<input name="bmv_pct" value="{{ cfg.thresholds.bmv_pct }}"></label>
+    <label>Strong BTL yield %<input name="strong_btl_yield_pct" value="{{ cfg.thresholds.strong_btl_yield_pct }}"></label>
+    <label>Strong BTL cashflow £/month<input name="strong_btl_cashflow" value="{{ cfg.thresholds.strong_btl_cashflow }}"></label>
+    <label class="check wide"><input type="checkbox" name="non_resident" {% if cfg.stamp_duty.buyer_is_non_resident %}checked{% endif %}> I'm a non-UK resident buyer (adds the stamp duty surcharge)</label>
+  </div>
+</div>
+
+<div class="card"><h3>7. Daily scan</h3>
+  <div class="form"><label>Scan every day at<input name="daily_at" value="{{ cfg.schedule.daily_at }}" size="6"></label></div>
+  <p class="muted">Runs while Deal Finder is open (it keeps running in the background after you close the browser tab).</p>
+</div>
+
+<div style="display:flex; gap:10px; margin-bottom:30px"><button>Save settings</button><a class="btn alt" href="/">Cancel</a></div>
+</form>
+{% endblock %}
