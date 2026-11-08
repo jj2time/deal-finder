@@ -38,10 +38,14 @@ class CachedClient:
         wait = self.min_interval - (time.time() - self._last)
         if wait > 0:
             time.sleep(wait)
-        resp = self.client.request(method, url, params=params, data=data, json=json_body,
-                                   headers=headers, timeout=timeout or 60)
+        try:
+            resp = self.client.request(method, url, params=params, data=data, json=json_body,
+                                       headers=headers, timeout=timeout or 60)
+        except httpx.TimeoutException as e:
+            raise RuntimeError(f"{httpx.URL(url).host} timed out") from e
         self._last = time.time()
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            raise RuntimeError(f"{resp.request.url.host} answered {resp.status_code}: {resp.text[:300]}")
         body = resp.json()
         if cache:
             self.db.execute("INSERT OR REPLACE INTO http_cache VALUES (?,?,?)", (k, json.dumps(body), time.time()))

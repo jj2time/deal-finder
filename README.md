@@ -3,7 +3,18 @@
 Finds UK property deals automatically, values each one against real sold prices, works out the numbers for
 every common investment strategy, and ranks them in a dashboard on your Mac.
 
-**What it does on every scan**
+**Searching**
+
+Type any UK postcode or district (e.g. `BS5 6HN` or `M14`), pick a radius, price range, bedrooms and property
+types, and tick the deal types you want — BMV, Repossession, Short lease, Probate, Auction, Cash only,
+Refurb / BRRR, Flip, HMO potential, Motivated seller, Negative equity, Lease option, Strong BTL, Problem property,
+Title split, Conversion, Serviced accommodation. Press **Search**: Deal Finder sends the matching Rightmove (and
+Zoopla) search to your Apify scrapers, values every property against Land Registry sold prices nearby, and shows
+the ones that match your ticks, best first. The first search of an area takes 1–3 minutes (the scraper fetches the
+listings live); changing the ticks afterwards, or repeating the search within 12 hours, is instant.
+**Save search** re-runs it every day and emails you new high-scoring deals.
+
+**What it does on every search or scan**
 
 1. Pulls listings from your sources: Apify scrapers (Rightmove / Zoopla), your portal alert emails, and any CSV
    you drop in `imports/` (auction catalogues etc.).
@@ -29,7 +40,7 @@ CSV export and a one-click PDF deal pack.
    **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to Deal Finder. Open the
    app again and click **Open**. You only do this once.
 4. The first launch sets itself up (a few minutes, needs internet), then opens the dashboard in your browser.
-5. Click **Settings**, fill it in (below), click **Save settings**, then **Scan now**.
+5. Click **Settings**, add your Apify token and scraper IDs (below), save, go back and search a postcode.
 
 Deal Finder keeps running in the background so it can scan every day at the time you choose. Open the app again to
 get back to the dashboard; click **Stop** on the dashboard to turn it off. Your settings and deals are saved in
@@ -41,9 +52,10 @@ To rebuild the zip from this repo: `macos/build_app.sh` → `dist/DealFinder-mac
 ## Settings page
 
 **1. Rightmove and Zoopla (Apify).** Create an account at apify.com and paste your API token. In the Apify Store,
-search "Rightmove" (or "Zoopla"), pick a scraper with good recent reviews, and paste its ID (from the page
-address, e.g. `someone/rightmove-scraper`). Then do your searches on rightmove.co.uk / zoopla.co.uk and paste each
-results-page address, one per line. If a scraper needs other options, add them under *Advanced*.
+search "Rightmove" (and "Zoopla" if you want both), pick a scraper with good recent reviews **that accepts search
+result page URLs**, and paste its ID (from the page address, e.g. `someone/rightmove-scraper`). Deal Finder sends
+it `{"startUrls": [{"url": "<the Rightmove search link>"}], "maxItems": 100}`; if your scraper names its inputs
+differently, change that under *Advanced*.
 
 If listings come in without prices or addresses, that scraper uses field names Deal Finder doesn't know yet — add
 them to `FIELD_NAMES` in `dealfinder/sources/apify.py`.
@@ -52,7 +64,7 @@ Scraping breaks Rightmove's and Zoopla's terms of use. They can block scrapers o
 so an Apify scraper can stop working without warning. Keep the email-alert backup on, use it for your own research,
 and don't republish the scraped data.
 
-**2. Areas and filters.** Postcode districts, price range, bedrooms, property types.
+**2. Filters for your other sources** (alert emails and imported CSVs). Area searches use the search page instead.
 
 **3. Rent estimates.** A PropertyData API key (paid) gives every deal a rent estimate, yield and cashflow. Without
 it, those are left blank rather than guessed.
@@ -64,7 +76,7 @@ address, create a Gmail App Password, and enter them here.
 
 **6. Deal maths** and **7. Daily scan time.**
 
-**Auctions and other lists:** use **Import** on the dashboard to add a CSV (see `imports/example.csv` for the
+**Auctions and other lists:** use **Import** on the search page to add a CSV (see `imports/example.csv` for the
 columns), then press **Scan now**.
 
 ## Running from Terminal (developers)
@@ -98,6 +110,9 @@ haven't been run against the real services yet — the first real scan is the te
 launcher was tested in a simulation, not on a real Mac.
 
 ## Not built yet
+
+- Repossessions are found from listing wording ("repossession", "mortgagee", "receivers") and auction
+  catalogues you import; there is no public database of repossessed homes.
 
 - The Gazette (probate / insolvency notices), planning data, Companies House and Land Registry company
   ownership lead sources.

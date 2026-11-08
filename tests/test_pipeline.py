@@ -28,6 +28,9 @@ class FakePostcodes:
     def nearby(self, lat, lon, radius):
         return [("BS5 6AA", 100.0)]
 
+    def ring(self, lat, lon, distance):
+        return []
+
 
 class FakeLR:
     def sold_prices(self, nearby, months_back):
@@ -60,13 +63,15 @@ def test_scan_stores_ranks_and_tracks_price_drops(cfg):
 def test_dashboard(cfg):
     scanner(cfg, 125000).run()
     client = TestClient(create_app(cfg))
-    r = client.get("/")
+    client.app.state.settings["postcodes"] = FakePostcodes()
+    r = client.get("/", params={"area": "BS5 6AA", "radius": 1})
     assert r.status_code == 200 and "12 Test Street" in r.text and "Open Government Licence" in r.text
-    assert "12 Test Street" in client.get("/", params={"strategy": "Refurb / BRRR"}).text
-    assert "12 Test Street" not in client.get("/", params={"strategy": "HMO potential"}).text
+    assert "12 Test Street" in client.get("/", params={"area": "BS5", "deal": "Refurb / BRRR"}).text
+    assert "12 Test Street" not in client.get("/", params={"area": "BS5", "deal": "HMO potential"}).text
+    assert "12 Test Street" in client.get("/", params={"area": "BS5", "deal": ["HMO potential", "BMV"]}).text
     d = client.get("/deal/rightmove:1")
     assert d.status_code == 200 and "Sold-price evidence" in d.text
-    csv = client.get("/export.csv")
+    csv = client.get("/export.csv", params={"area": "BS5"})
     assert csv.status_code == 200 and "12 Test Street" in csv.text
     pdf = client.get("/deal/rightmove:1/pack.pdf")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"

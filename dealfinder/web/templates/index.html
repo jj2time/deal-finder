@@ -1,72 +1,133 @@
 {% extends "base.html" %}
 {% block header %}
-<span class="muted">{{ items|length }} of {{ total }} deals</span>
 <span style="flex:1"></span>
-{% if scan.running %}<span class="muted">Scanning… this page refreshes when it's done</span>{% else %}
-<form method="post" action="/scan" style="margin:0"><button>Scan now</button></form>{% endif %}
 <a class="btn alt" href="/settings">Settings</a>
-<a class="btn alt" href="/export.csv?strategy={{ strategy|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}&q={{ q|urlencode }}">Export CSV</a>
 {% endblock %}
 {% block content %}
 {% if msg %}<div class="card ok">{{ msg }}</div>{% endif %}
-{% if scan.error %}<div class="card warn">Last scan failed: {{ scan.error }}</div>{% endif %}
-{% if scan.last and not scan.running %}<div class="card muted">Last scan: {{ scan.last.fetched }} listings found, {{ scan.last.kept }} matched your filters, {{ scan.last.new }} new.</div>{% endif %}
-{% if needs_setup %}<div class="card ok"><b>Welcome.</b> Start in <a href="/settings">Settings</a>: add your Apify token and the Rightmove/Zoopla searches you want scanned, then press <b>Scan now</b>.</div>{% endif %}
-<div class="card">
-  <form class="filters" method="get">
-    <label>Search<input name="q" value="{{ q }}" placeholder="Address or postcode"></label>
-    <label>Min BMV %<input name="min_bmv" value="{{ min_bmv }}" size="5"></label>
-    <label>Min yield %<input name="min_yield" value="{{ min_yield }}" size="5"></label>
-    <input type="hidden" name="strategy" value="{{ strategy }}">
-    <button>Filter</button>
-  </form>
-  <form method="post" action="/upload" enctype="multipart/form-data" style="margin-top:10px" class="filters">
-    <label>Import auction catalogue or any list (CSV)<input type="file" name="file" accept=".csv" required></label>
-    <button class="btn alt">Import</button>
-  </form>
-  <div class="chips" style="margin-top:10px">
-    <a class="tag {% if not strategy %}on{% endif %}" href="?q={{ q|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}">All</a>
-    {% for s in strategies %}<a class="tag {% if s == strategy %}on{% endif %}" href="?strategy={{ s|urlencode }}&q={{ q|urlencode }}&min_bmv={{ min_bmv }}&min_yield={{ min_yield }}">{{ s }}</a>{% endfor %}
+{% if needs_setup %}<div class="card ok"><b>Welcome.</b> Before your first search, open <a href="/settings">Settings</a> and add your Apify token and a Rightmove and/or Zoopla scraper ID (it takes about 5 minutes).</div>{% endif %}
+{% if scan.error and not scan.running %}<div class="card warn">{{ scan.error }}</div>{% endif %}
+
+<form class="card" method="post" action="/search" id="search">
+  <div class="searchbar">
+    <label class="grow">Postcode or district
+      <input name="area" value="{{ s.area }}" placeholder="e.g. BS5 6HN or M14" autofocus required></label>
+    <label>Radius
+      <select name="radius">{% for r in radii %}<option value="{{ r }}" {% if r == s.radius_miles %}selected{% endif %}>{{ r|string|replace('.0','') }} mile{% if r != 1 %}s{% endif %}</option>{% endfor %}</select></label>
+    <label>Min price £<input name="min_price" value="{{ s.min_price or '' }}" size="8" inputmode="numeric"></label>
+    <label>Max price £<input name="max_price" value="{{ s.max_price or '' }}" size="8" inputmode="numeric"></label>
+    <label>Min beds
+      <select name="min_beds"><option value="">Any</option>{% for b in range(1,7) %}<option value="{{ b }}" {% if s.min_beds == b %}selected{% endif %}>{{ b }}+</option>{% endfor %}</select></label>
+    <button class="big">Search</button>
   </div>
+
+  <div class="row">
+    <span class="muted">Property type:</span>
+    {% for t in types %}<label class="check"><input type="checkbox" name="type" value="{{ t }}" {% if t in s.types %}checked{% endif %}> {{ t|capitalize }}</label>{% endfor %}
+  </div>
+
+  <fieldset class="deals">
+    <legend>Deal types <span class="muted">— tick the ones you want; none ticked shows every property</span>
+      <button type="button" class="link" onclick="tickAll(true)">tick all</button> · <button type="button" class="link" onclick="tickAll(false)">clear</button></legend>
+    <div class="dealgrid">
+    {% for name, desc in strategies.items() %}
+      <label class="deal" title="{{ desc }}"><input type="checkbox" name="deal" value="{{ name }}" {% if name in s.deals %}checked{% endif %}>
+        <span><b>{{ name }}</b>{% if s.area %} <span class="count">{{ counts[name] }}</span>{% endif %}<br><span class="muted small">{{ desc }}</span></span></label>
+    {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="row">
+    <label>Min BMV %<input name="min_bmv" value="{{ s.min_bmv if s.min_bmv is not none else '' }}" size="4"></label>
+    <label>Min yield %<input name="min_yield" value="{{ s.min_yield if s.min_yield is not none else '' }}" size="4"></label>
+    <label>Sort by<select name="sort">{% for k, label in sorts.items() %}<option value="{{ k }}" {% if k == s.sort %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="check" title="Fetch new listings now, even if this area was searched in the last 12 hours"><input type="checkbox" name="refresh"> Fetch the latest listings now</label>
+  </div>
+</form>
+
+{% if scan.running %}
+<div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
+{% endif %}
+
+{% if s.area %}
+<div class="card resultsbar">
+  <div><b>{{ items|length }} propert{{ 'y' if items|length == 1 else 'ies' }}</b> {{ s.describe() }}{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}
+    <br><span class="muted small">{% if last_fetched %}Listings last fetched {{ last_fetched[:16]|replace('T',' ') }} UTC.{% elif not searching %}Not fetched yet — press Search.{% endif %}</span></div>
+  <span style="flex:1"></span>
+  <form method="post" action="/search/save" style="margin:0">
+    {% for k, v in request.query_params.multi_items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    {% if saved %}<input type="hidden" name="saved" value="0"><button class="btn alt" title="Stop scanning this search every day">★ Saved — scans daily</button>
+    {% else %}<input type="hidden" name="saved" value="1"><button class="btn alt" title="Re-run this search every day and email me new deals">☆ Save search (scan daily)</button>{% endif %}
+  </form>
+  <a class="btn alt" href="/export.csv?{{ query }}">Export CSV</a>
 </div>
-{% if points %}<div class="card"><div id="map"></div></div>{% endif %}
+{% endif %}
+
+{% if points %}<div class="card" id="mapcard"><div id="map"></div></div>{% endif %}
+
+{% if s.area and items %}
 <div class="card scroll">
-{% if not items %}
-  <p class="muted">No deals yet. Set up <code>config.yaml</code> and <code>.env</code>, then press <b>Scan now</b> (or run <code>python -m dealfinder scan</code>).</p>
-{% else %}
 <table>
-  <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Value</th><th class="num">BMV</th>
-  <th class="num">Yield</th><th class="num">Cashflow</th><th>Strategies</th><th>Source</th></tr></thead>
+  <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Area value</th><th class="num">BMV</th>
+  <th class="num">Yield</th><th class="num">Cashflow</th><th>Deal types</th><th>Source</th></tr></thead>
   <tbody>
   {% for it in items %}{% set l = it.listing %}{% set a = it.analysis %}
   <tr>
     <td><span class="score {% if a.score < 40 %}low{% elif a.score < 65 %}mid{% endif %}">{{ a.score }}</span></td>
-    <td><a href="/deal/{{ l.key }}">{{ l.address or "Unknown address" }}</a><br>
+    <td>{% if l.image %}<img class="thumb" src="{{ l.image }}" alt="" loading="lazy">{% endif %}
+      <a href="/deal/{{ l.key }}">{{ l.address or "Unknown address" }}</a><br>
       <span class="muted">{{ l.bedrooms or "?" }} bed {{ l.property_type }} · {{ l.postcode or l.outcode or "no postcode" }}</span></td>
     <td class="num">{{ l.price|money }}</td>
     <td class="num">{{ a.market_value|money }}<br><span class="muted">{{ a.valuation_comps }} sales</span></td>
     <td class="num">{% if a.bmv_pct is not none %}{{ a.bmv_pct }}%{% else %}—{% endif %}</td>
     <td class="num">{% if a.gross_yield_pct is not none %}{{ a.gross_yield_pct }}%{% else %}—{% endif %}</td>
     <td class="num">{{ a.monthly_cashflow|money }}</td>
-    <td>{% for s in a.strategies %}<span class="tag" title="{{ s.reason }}">{{ s.name }}</span>{% endfor %}</td>
+    <td>{% for m in a.strategies %}<span class="tag {% if m.name in s.deals %}on{% endif %}" title="{{ m.reason }}">{{ m.name }}</span>{% endfor %}</td>
     <td>{% if l.url %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.source }}</a>{% else %}{{ l.source }}{% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>
 </table>
-{% endif %}
 </div>
+{% elif s.area and last_fetched and not scan.running %}
+<div class="card muted">No properties match. Try a bigger radius, fewer deal types, or a wider price range.</div>
+{% endif %}
+
+<div class="card">
+  <h3>Saved searches</h3>
+  {% if saved_searches %}
+  <ul class="plain">{% for ss in saved_searches %}
+    <li><a href="/?area={{ ss.area|urlencode }}&radius={{ ss.radius_miles }}{% if ss.min_price %}&min_price={{ ss.min_price }}{% endif %}{% if ss.max_price %}&max_price={{ ss.max_price }}{% endif %}{% if ss.min_beds %}&min_beds={{ ss.min_beds }}{% endif %}{% for t in ss.types %}&type={{ t|urlencode }}{% endfor %}{% for d in ss.deals %}&deal={{ d|urlencode }}{% endfor %}">{{ ss.area }}, {{ ss.radius_miles|string|replace('.0','') }} mi{% if ss.max_price %}, up to £{{ "{:,}".format(ss.max_price) }}{% endif %}{% if ss.deals %} — {{ ss.deals|join(', ') }}{% endif %}</a></li>
+  {% endfor %}</ul>
+  <form method="post" action="/scan" style="margin:8px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all saved searches now</button>
+    <span class="muted small">They also run automatically every day while Deal Finder is open.</span></form>
+  {% else %}<p class="muted">Search an area, then press <b>Save search</b> to have it re-checked every day.</p>{% endif %}
+  <form method="post" action="/upload" enctype="multipart/form-data" class="row" style="margin-top:14px">
+    <label>Import an auction catalogue or any list (CSV)<input type="file" name="file" accept=".csv" required></label>
+    <button class="btn alt">Import</button>
+  </form>
+</div>
+
+<script>
+  function tickAll(on) { document.querySelectorAll('input[name=deal]').forEach(c => c.checked = on); }
+</script>
+{% if scan.running %}<script>
+  setInterval(async () => {
+    const st = await (await fetch('/scan/status')).json();
+    if (!st.running) location.reload();
+    else document.getElementById('progress').textContent = st.progress || '';
+  }, 2500);
+</script>{% endif %}
 {% if points %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+  if (!window.L) { document.getElementById('mapcard').remove(); } else {
   const pts = {{ points|tojson }};
   const map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© OpenStreetMap contributors'}).addTo(map);
   const group = L.featureGroup(pts.map(p => L.marker([p.lat, p.lon]).bindPopup(`<a href="/deal/${encodeURI(p.key)}">${p.label}</a>`))).addTo(map);
   map.fitBounds(group.getBounds().pad(0.2));
+  }
 </script>
 {% endif %}
-{% if scan.running %}<script>
-  setInterval(async () => { const r = await fetch('/scan/status'); if (!(await r.json()).running) location.reload(); }, 3000);
-</script>{% endif %}
 {% endblock %}

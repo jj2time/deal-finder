@@ -14,29 +14,15 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from ..config import ENV_KEYS, SECRET_KEYS, home_path, load_config, read_env, save_config, save_env
+from ..config import ENV_KEYS, SECRET_KEYS, env, home_path, load_config, read_env, save_config, save_env
 from ..db import DB
+from ..analysis.strategies import STRATEGIES
 from ..models import PROPERTY_TYPES
+from ..search import RADII_MILES, SORTS, Search, matches
 from .dealpack import build_pdf
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["money"] = lambda v: f"£{v:,.0f}" if isinstance(v, (int, float)) else "—"
-
-
-def _filter(items, strategy, min_bmv, min_yield, q):
-    out = []
-    for it in items:
-        a, l = it["analysis"], it["listing"]
-        if strategy and strategy not in {s["name"] for s in a["strategies"]}:
-            continue
-        if min_bmv is not None and (a.get("bmv_pct") is None or a["bmv_pct"] < min_bmv):
-            continue
-        if min_yield is not None and (a.get("gross_yield_pct") is None or a["gross_yield_pct"] < min_yield):
-            continue
-        if q and q.lower() not in f"{l.get('address')} {l.get('postcode')} {l.get('outcode')}".lower():
-            continue
-        out.append(it)
-    return out
 
 
 def _num(v, cast=float):
@@ -47,16 +33,11 @@ def _num(v, cast=float):
 
 
 def _apify_form(cfg: dict) -> dict:
-    """The first Apify run, as the simple fields the Settings page shows."""
-    runs = (cfg.get("sources", {}).get("apify") or {}).get("runs") or []
-    run = runs[0] if runs else {}
-    inp = dict(run.get("input") or {})
-    urls = [u.get("url") if isinstance(u, dict) else u for u in inp.pop("startUrls", [])]
-    max_items = inp.pop("maxItems", 100)
-    actor = run.get("actor_id", "")
-    return {"actor_id": "" if str(actor).startswith("REPLACE") else actor,
-            "urls": "\n".join(u for u in urls if u), "max_items": max_items,
-            "extra": json.dumps(inp, indent=2) if inp else ""}
+    a = cfg.get("sources", {}).get("apify") or {}
+    extra = a.get("extra_input") or {}
+    return {"rightmove_actor_id": a.get("rightmove_actor_id", ""), "zoopla_actor_id": a.get("zoopla_actor_id", ""),
+            "max_items": a.get("max_items", 100), "url_field": a.get("url_field", "startUrls"),
+            "extra": json.dumps(extra, indent=2) if extra else ""}
 
 
 def apply_settings(cfg: dict, form: dict) -> list[str]:
@@ -72,22 +53,21 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
 
     src = cfg.setdefault("sources", {})
     apify = src.setdefault("apify", {})
-    apify["enabled"] = bool(form.get("apify_enabled"))
-    urls = [u.strip() for u in form.get("apify_urls", "").splitlines() if u.strip()]
-    inp: dict = {}
+    apify["enabled"] = True
+    apify["rightmove_actor_id"] = form.get("rightmove_actor_id", "").strip()
+    apify["zoopla_actor_id"] = form.get("zoopla_actor_id", "").strip()
+    apify["max_items"] = _num(form.get("apify_max_items"), int) or 100
+    apify["url_field"] = form.get("apify_url_field", "").strip() or "startUrls"
+    apify["extra_input"] = {}
     if form.get("apify_extra", "").strip():
         try:
-            inp = json.loads(form["apify_extra"])
-            if not isinstance(inp, dict):
+            extra = json.loads(form["apify_extra"])
+            if not isinstance(extra, dict):
                 raise ValueError
+            apify["extra_input"] = extra
         except ValueError:
-            errors.append("Extra Apify input must be JSON like {\"key\": \"value\"}.")
-            inp = {}
-    inp["startUrls"] = [{"url": u} for u in urls]
-    inp["maxItems"] = _num(form.get("apify_max_items"), int) or 100
-    apify["runs"] = [{"name": "My portal searches",
-                      "actor_id": form.get("apify_actor_id", "").strip() or "REPLACE-WITH-ACTOR-ID",
-                      "input": inp}]
+            errors.append("Extra scraper options must be JSON like {\"key\": \"value\"}.")
+    apify["runs"] = []   # replaced by area searches
     src.setdefault("email_alerts", {"folder": "INBOX", "days_back": 3})["enabled"] = bool(form.get("email_enabled"))
     src.setdefault("csv_import", {"folder": "imports"})["enabled"] = True
 
@@ -119,7 +99,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     state = {"cfg": cfg or load_config()}
     db = DB(state["cfg"]["database"])
     app = FastAPI(title="Deal Finder")
-    scan_state = {"running": False, "last": None, "error": None}
+    scan_state = {"running": False, "last": None, "error": None, "query": None, "label": "", "progress": ""}
 
     def ctx(request, **kw):
         return {"request": request, "year": date.today().year, "scan": scan_state, **kw}
@@ -128,19 +108,64 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     def health():
         return {"ok": True}
 
+    def locate(s: Search):
+        if not s.area:
+            return None
+        from ..data.http import CachedClient
+        from ..data.postcodes import Postcodes
+        if "postcodes" not in state:
+            state["postcodes"] = Postcodes(CachedClient(
+                str(Path(state["cfg"]["database"]).with_name("http_cache.sqlite3"))))
+        return state["postcodes"].locate(s.area if s.is_full_postcode else None,
+                                         None if s.is_full_postcode else s.area)
+
+    def current_search(request: Request) -> Search:
+        qp = request.query_params
+        return Search.from_params(qp.get, qp.getlist)
+
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request, strategy: str = "", min_bmv: str = "", min_yield: str = "", q: str = "",
-              msg: str = ""):
+    def index(request: Request, msg: str = ""):
+        s = current_search(request)
         items = db.results()
-        all_strategies = sorted({s["name"] for it in items for s in it["analysis"]["strategies"]})
-        shown = _filter(items, strategy, _num(min_bmv), _num(min_yield), q)
+        centre = locate(s)
+        shown = [it for it in items if matches(it, s, centre)] if s.area else []
+        shown.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
+        counts = {name: sum(1 for it in shown if name in {m["name"] for m in it["analysis"]["strategies"]})
+                  for name in STRATEGIES}
         points = [{"lat": it["listing"]["lat"], "lon": it["listing"]["lon"], "key": it["listing"]["key"],
                    "label": f"{it['listing'].get('address')} — {it['analysis']['score']}"}
                   for it in shown if it["listing"].get("lat") and it["listing"].get("lon")]
-        needs_setup = not read_env().get("APIFY_TOKEN") and not items
+        acfg = state["cfg"].get("sources", {}).get("apify") or {}
+        needs_setup = not env("APIFY_TOKEN") or not (acfg.get("rightmove_actor_id") or acfg.get("zoopla_actor_id"))
+        last = db.last_fetched(s.fetch_key) if s.area else None
         return TEMPLATES.TemplateResponse(request, "index.html", ctx(
-            request, items=shown, total=len(items), strategies=all_strategies, strategy=strategy,
-            min_bmv=min_bmv, min_yield=min_yield, q=q, points=points, msg=msg, needs_setup=needs_setup))
+            request, s=s, items=shown, total=len(items), strategies=STRATEGIES, counts=counts,
+            radii=RADII_MILES, sorts={k: v[0] for k, v in SORTS.items()}, types=PROPERTY_TYPES,
+            points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
+            searching=scan_state["running"] and scan_state.get("query") == s.query_string(),
+            saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
+            query=s.query_string()))
+
+    @app.post("/search")
+    async def run_search(request: Request):
+        form = await request.form()
+        s = Search.from_params(form.get, form.getlist)
+        q = s.query_string()
+        if not s.area:
+            return RedirectResponse("/?msg=Type+a+postcode+first.", status_code=303)
+        from ..pipeline import Scanner
+        scanner = Scanner(state["cfg"], db=db)
+        if not form.get("refresh") and not scanner.needs_fetch(s):
+            return RedirectResponse(f"/?{q}", status_code=303)
+        start_job(lambda sc: sc.run_search(s), q, f"Searching {s.describe()}")
+        return RedirectResponse(f"/?{q}", status_code=303)
+
+    @app.post("/search/save")
+    async def save_search(request: Request):
+        form = await request.form()
+        s = Search.from_params(form.get, form.getlist)
+        db.set_saved(s.fetch_key, s.to_dict(), form.get("saved") == "1")
+        return RedirectResponse(f"/?{s.query_string()}", status_code=303)
 
     @app.get("/deal/{key:path}/pack.pdf")
     def pack(key: str):
@@ -158,8 +183,10 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         return TEMPLATES.TemplateResponse(request, "detail.html", ctx(request, it=item))
 
     @app.get("/export.csv")
-    def export(strategy: str = "", min_bmv: str = "", min_yield: str = "", q: str = ""):
-        items = _filter(db.results(), strategy, _num(min_bmv), _num(min_yield), q)
+    def export(request: Request):
+        s = current_search(request)
+        items = [it for it in db.results() if matches(it, s, locate(s))] if s.area else db.results()
+        items.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(["score", "address", "postcode", "price", "market_value", "bmv_pct", "rent_pcm",
@@ -174,19 +201,29 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                                  headers={"Content-Disposition": 'attachment; filename="deals.csv"'})
 
+    def start_job(work, query: str = "", label: str = "Scanning"):
+        if scan_state["running"]:
+            return False
+
+        def run():
+            from ..pipeline import Scanner, SearchError
+            scan_state.update(running=True, error=None, query=query, label=label, progress=label + "…")
+            try:
+                scanner = Scanner(state["cfg"], db=db)
+                scanner.progress = lambda m: scan_state.__setitem__("progress", m)
+                scan_state["last"] = work(scanner)
+            except SearchError as e:
+                scan_state["error"] = str(e)
+            except Exception as e:  # shown on the page
+                scan_state["error"] = f"Something went wrong: {e}"
+            finally:
+                scan_state["running"] = False
+        threading.Thread(target=run, daemon=True).start()
+        return True
+
     @app.post("/scan")
     def scan():
-        if not scan_state["running"]:
-            def work():
-                from ..pipeline import Scanner
-                scan_state.update(running=True, error=None)
-                try:
-                    scan_state["last"] = Scanner(state["cfg"], db=db).run()
-                except Exception as e:  # shown on the dashboard
-                    scan_state["error"] = str(e)
-                finally:
-                    scan_state["running"] = False
-            threading.Thread(target=work, daemon=True).start()
+        start_job(lambda sc: sc.run(), "", "Running saved searches")
         return RedirectResponse("/", status_code=303)
 
     @app.get("/scan/status")

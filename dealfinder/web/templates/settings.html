@@ -7,26 +7,33 @@
 <form method="post" action="/settings" autocomplete="off">
 
 <div class="card"><h3>1. Rightmove and Zoopla (via Apify)</h3>
-  <p class="muted">Create a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener">apify.com</a>.
-  Copy your API token from <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noopener">Settings → API &amp; Integrations</a>.
-  Then, in the <a href="https://apify.com/store?search=rightmove" target="_blank" rel="noopener">Apify Store</a>, pick a Rightmove or Zoopla scraper with good reviews and copy its ID from the page address (it looks like <code>someone/rightmove-scraper</code>).</p>
-  <label class="check"><input type="checkbox" name="apify_enabled" {% if cfg.sources.apify.enabled %}checked{% endif %}> Use Apify</label>
+  <p class="muted">The search page sends your postcode searches to Apify, which fetches the listings from Rightmove and Zoopla.</p>
+  <ol class="muted small">
+    <li>Create a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener">apify.com</a>.</li>
+    <li>Copy your API token from <a href="https://console.apify.com/settings/integrations" target="_blank" rel="noopener">Settings → API &amp; Integrations</a> and paste it below.</li>
+    <li>In the Apify Store, open a <a href="https://apify.com/store?search=rightmove" target="_blank" rel="noopener">Rightmove scraper</a> (and a <a href="https://apify.com/store?search=zoopla" target="_blank" rel="noopener">Zoopla scraper</a> if you want both) with good reviews that takes <b>search result page URLs</b>. Copy its ID from the page address, e.g. <code>someone/rightmove-scraper</code>.</li>
+  </ol>
   <div class="form">
     <label>Apify API token {% if has_secret.APIFY_TOKEN %}<span class="ok-text">saved ✓ (leave blank to keep)</span>{% endif %}
       <input type="password" name="env_APIFY_TOKEN" placeholder="apify_api_..."></label>
-    <label>Scraper ID<input name="apify_actor_id" value="{{ apify.actor_id }}" placeholder="someone/rightmove-scraper"></label>
-    <label class="wide">Search pages to scan, one per line
-      <span class="muted">Do your search on rightmove.co.uk or zoopla.co.uk (area, price, type), then copy the page address here.</span>
-      <textarea name="apify_urls" rows="4" placeholder="https://www.rightmove.co.uk/property-for-sale/find.html?...">{{ apify.urls }}</textarea></label>
-    <label>Max listings per scan<input name="apify_max_items" value="{{ apify.max_items }}" size="6"></label>
-    <details class="wide"><summary class="muted">Advanced: extra input for this scraper (JSON)</summary>
-      <textarea name="apify_extra" rows="4" placeholder='{"includeDescription": true}'>{{ apify.extra }}</textarea></details>
+    <label>Rightmove scraper ID<input name="rightmove_actor_id" value="{{ apify.rightmove_actor_id }}" placeholder="someone/rightmove-scraper"></label>
+    <label>Zoopla scraper ID <span class="muted">(optional)</span><input name="zoopla_actor_id" value="{{ apify.zoopla_actor_id }}" placeholder="someone/zoopla-scraper"></label>
+    <label>Max listings per portal per search<input name="apify_max_items" value="{{ apify.max_items }}" size="6"></label>
+    <details class="wide"><summary class="muted">Advanced: if your scraper's input is different</summary>
+      <div class="form">
+        <label>Name of the scraper's "URLs" input<input name="apify_url_field" value="{{ apify.url_field }}"></label>
+        <label class="wide">Extra options for the scraper (JSON)
+          <textarea name="apify_extra" rows="3" placeholder='{"includeFullDescription": true}'>{{ apify.extra }}</textarea></label>
+      </div>
+      <p class="muted small">Deal Finder sends <code>{"startUrls": [{"url": "…"}], "maxItems": 100}</code> plus anything above. Check the scraper's Input tab for the names it expects.</p>
+    </details>
   </div>
 </div>
 
-<div class="card"><h3>2. Areas and filters</h3>
+<div class="card"><h3>2. Daily scan of your other sources</h3>
+  <p class="muted">Area searches use the filters on the search page. These filters apply to your alert emails and imported CSV files.</p>
   <div class="form">
-    <label class="wide">Postcode districts <span class="muted">e.g. BS5, M14, L4. Leave empty for anywhere.</span>
+    <label class="wide">Only these postcode districts <span class="muted">e.g. BS5, M14, L4. Leave empty for anywhere.</span>
       <input name="districts" value="{{ cfg.areas.postcode_districts|join(', ') }}"></label>
     <label>Min price £<input name="min_price" value="{{ cfg.filters.min_price }}"></label>
     <label>Max price £<input name="max_price" value="{{ cfg.filters.max_price }}"></label>

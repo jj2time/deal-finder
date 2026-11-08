@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS price_history (key TEXT, price INTEGER, seen_at TEXT)
 CREATE TABLE IF NOT EXISTS analyses (key TEXT PRIMARY KEY, score INTEGER, data TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS alerts_sent (key TEXT PRIMARY KEY, sent_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_ph_key ON price_history(key);
+CREATE TABLE IF NOT EXISTS searches (
+  fetch_key TEXT PRIMARY KEY, search TEXT, last_fetched TEXT, last_count INTEGER, saved INTEGER DEFAULT 0
+);
 """
 
 
@@ -98,3 +101,30 @@ class DB:
         cur = self.conn.execute("INSERT OR IGNORE INTO alerts_sent VALUES (?,?)", (key, now()))
         self.conn.commit()
         return cur.rowcount == 1
+
+    # ---- area searches ----
+    def mark_fetched(self, fetch_key: str, search: dict, count: int) -> None:
+        self.conn.execute(
+            "INSERT INTO searches (fetch_key, search, last_fetched, last_count) VALUES (?,?,?,?) "
+            "ON CONFLICT(fetch_key) DO UPDATE SET search=excluded.search, last_fetched=excluded.last_fetched, "
+            "last_count=excluded.last_count", (fetch_key, json.dumps(search), now(), count))
+        self.conn.commit()
+
+    def last_fetched(self, fetch_key: str) -> str | None:
+        row = self.conn.execute("SELECT last_fetched FROM searches WHERE fetch_key=?", (fetch_key,)).fetchone()
+        return row["last_fetched"] if row else None
+
+    def set_saved(self, fetch_key: str, search: dict, saved: bool) -> None:
+        self.conn.execute(
+            "INSERT INTO searches (fetch_key, search, saved) VALUES (?,?,?) "
+            "ON CONFLICT(fetch_key) DO UPDATE SET search=excluded.search, saved=excluded.saved",
+            (fetch_key, json.dumps(search), int(saved)))
+        self.conn.commit()
+
+    def saved_searches(self) -> list[dict]:
+        return [{**json.loads(r["search"]), "_fetch_key": r["fetch_key"], "_last_fetched": r["last_fetched"]}
+                for r in self.conn.execute("SELECT * FROM searches WHERE saved=1 ORDER BY fetch_key")]
+
+    def is_saved(self, fetch_key: str) -> bool:
+        row = self.conn.execute("SELECT saved FROM searches WHERE fetch_key=?", (fetch_key,)).fetchone()
+        return bool(row and row["saved"])

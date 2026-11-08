@@ -97,6 +97,38 @@ def map_item(item: dict, source: str = "apify") -> Listing | None:
     )
 
 
+def friendly_error(text: str, actor_id: str) -> str:
+    if " 401" in text or "token is not valid" in text:
+        return "Apify says your API token isn't valid. Check it in Settings."
+    if " 404" in text:
+        return f"Apify can't find the scraper “{actor_id}”. Check the scraper ID in Settings."
+    if " 402" in text or "credit" in text.lower() or "usage" in text.lower():
+        return "Your Apify account is out of credit for this month. Top up or wait for the monthly reset."
+    if " 400" in text:
+        return ("The scraper didn't accept the search. Check its Input tab on Apify and the advanced "
+                "scraper settings in Settings. Apify said: " + text.split(":", 1)[-1].strip()[:200])
+    if "timed out" in text.lower() or "timeout" in text.lower():
+        return "The scraper took longer than 5 minutes. Try a smaller radius or fewer listings per search."
+    return text[:300]
+
+
+def run_actor(http, actor_id: str, actor_input: dict) -> list[Listing]:
+    """Runs one Apify actor and waits for its results (Apify allows up to 5 minutes)."""
+    token = env("APIFY_TOKEN")
+    if not token:
+        raise RuntimeError("APIFY_TOKEN not set")
+    actor = str(actor_id).strip().replace("/", "~")
+    try:
+        items = http.request_json("POST", API.format(actor=actor), json_body=actor_input,
+                                  headers={"Authorization": f"Bearer {token}"}, cache=False, timeout=310)
+    except RuntimeError as e:
+        raise RuntimeError(friendly_error(str(e), actor_id)) from e
+    if isinstance(items, dict):   # Apify reports errors as {"error": {...}}
+        err = items.get("error") or {}
+        raise RuntimeError(err.get("message") or "unexpected response from Apify")
+    return [l for l in (map_item(i) for i in items or []) if l]
+
+
 class ApifySource:
     name = "apify"
 

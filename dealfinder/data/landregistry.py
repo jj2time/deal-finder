@@ -5,6 +5,7 @@ Open Government Licence v3.0.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, timedelta
 
 from ..models import Comparable
@@ -68,6 +69,7 @@ def parse_results(body: dict, distances: dict[str, float] | None = None) -> list
 class LandRegistry:
     def __init__(self, http):
         self.http = http
+        self._by_postcode: dict[str, list[Comparable]] = {}   # remembered for the whole scan
 
     def sold_prices(self, postcodes_with_distance: list[tuple[str, float]], months_back: int = 24,
                     today: date | None = None) -> list[Comparable]:
@@ -76,13 +78,16 @@ class LandRegistry:
         today = today or date.today()
         since = (today - timedelta(days=int(months_back * 30.44) + 400)).isoformat()  # extra year for sales history
         distances = {pc: d for pc, d in postcodes_with_distance}
-        comps: list[Comparable] = []
-        pcs = sorted(distances)
-        for i in range(0, len(pcs), 50):
-            chunk = pcs[i:i + 50]
+        todo = sorted(pc for pc in distances if pc not in self._by_postcode)
+        for i in range(0, len(todo), 50):
+            chunk = todo[i:i + 50]
             values = " ".join(f'"{pc}"^^xsd:string' for pc in chunk)
             body = self.http.request_json(
                 "POST", ENDPOINT, data={"query": QUERY % (values, since)},
                 headers={"Accept": "application/sparql-results+json"}, timeout=120)
-            comps.extend(parse_results(body, distances))
-        return comps
+            for pc in chunk:
+                self._by_postcode[pc] = []
+            for c in parse_results(body):
+                self._by_postcode.setdefault(c.postcode, []).append(c)
+        return [replace(c, distance_m=distances[pc])
+                for pc in distances for c in self._by_postcode.get(pc, [])]

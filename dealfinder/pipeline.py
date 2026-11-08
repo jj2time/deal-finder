@@ -1,23 +1,33 @@
-"""One scan: fetch every source -> filter -> store -> value -> analyse -> alert."""
+"""Fetching and analysing listings: area searches, saved searches and the daily scan."""
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable, Iterable
 
 from .analysis import analyse
+from .analysis.valuation import value_from_comps
+from .config import env
 from .data.http import CachedClient
 from .data.landregistry import LandRegistry
 from .data.postcodes import Postcodes
 from .data.propertydata import PropertyData
 from .db import DB
 from .models import Listing
-from .sources.apify import ApifySource
+from .search import Search, rightmove_location_id, rightmove_url, zoopla_url
+from .sources.apify import ApifySource, run_actor
 from .sources.csv_import import CsvImportSource
 from .sources.email_alerts import EmailAlertSource
 
 log = logging.getLogger(__name__)
 
 SOURCE_TYPES = {"apify": ApifySource, "email_alerts": EmailAlertSource, "csv_import": CsvImportSource}
+REFETCH_AFTER = timedelta(hours=12)
+
+
+class SearchError(Exception):
+    """A problem the person needs to fix (shown on the page)."""
 
 
 def passes_filters(l: Listing, cfg: dict) -> bool:
@@ -38,9 +48,22 @@ def passes_filters(l: Listing, cfg: dict) -> bool:
     return True
 
 
+def search_filter(s: Search) -> Callable[[Listing], bool]:
+    def keep(l: Listing) -> bool:
+        if l.price is not None:
+            if s.min_price and l.price < s.min_price:
+                return False
+            if s.max_price and l.price > s.max_price:
+                return False
+        if s.min_beds and l.bedrooms is not None and l.bedrooms < s.min_beds:
+            return False
+        return l.property_type in s.types or l.property_type == "other"
+    return keep
+
+
 class Scanner:
     def __init__(self, cfg: dict, db: DB | None = None, http=None, land_registry=None, postcodes=None,
-                 propertydata=None, sources=None):
+                 propertydata=None, sources=None, apify_runner=None):
         self.cfg = cfg
         self.db = db or DB(cfg["database"])
         cache_path = str(Path(cfg["database"]).with_name("http_cache.sqlite3"))
@@ -49,6 +72,8 @@ class Scanner:
         self.pc = postcodes or Postcodes(self.http)
         self.pd = propertydata or PropertyData(self.http)
         self.sources = sources if sources is not None else self._build_sources()
+        self.apify_runner = apify_runner or (lambda actor, inp: run_actor(self.http, actor, inp))
+        self.progress: Callable[[str], None] = lambda msg: None
 
     def _build_sources(self):
         out = []
@@ -57,15 +82,28 @@ class Scanner:
                 out.append(SOURCE_TYPES[name](scfg, self.http))
         return out
 
+    # ---- valuation evidence ----
     def comparables(self, l: Listing):
         loc = (l.lat, l.lon) if l.lat and l.lon else self.pc.locate(l.postcode, l.outcode)
         if not loc:
             return []
         if not (l.lat and l.lon):
             l.lat, l.lon = loc
-        radius = max(self.cfg["valuation"]["radii_m"])
-        nearby = self.pc.nearby(loc[0], loc[1], radius)
-        return self.lr.sold_prices(nearby, self.cfg["valuation"]["months_back"])
+        v = self.cfg["valuation"]
+        max_r = max(v["radii_m"])
+        known = dict(self.pc.nearby(loc[0], loc[1], max_r))
+        if l.postcode and l.postcode not in known:
+            known[l.postcode] = 0.0   # always include the property's own postcode (sales history)
+        comps = self.lr.sold_prices(list(known.items()), v["months_back"])
+        # Only look further out when the nearest postcodes don't hold enough sales.
+        for ring_m in (max_r * 0.45, max_r * 0.8):
+            if value_from_comps(comps, l.property_type, v["radii_m"], v["min_comparables"],
+                                v["months_back"]).count >= v["min_comparables"]:
+                break
+            more = [(pc, d) for pc, d in self.pc.ring(loc[0], loc[1], ring_m) if pc not in known and d <= max_r]
+            known.update(more)
+            comps += self.lr.sold_prices(more, v["months_back"])
+        return comps
 
     def analyse_listing(self, l: Listing):
         try:
@@ -83,29 +121,99 @@ class Scanner:
             a.notes.append(f"Only the district ({l.outcode}) is known — comparables are from around its centre.")
         return a
 
-    def run(self) -> dict:
+    # ---- processing ----
+    def process(self, listings: Iterable[Listing], keep: Callable[[Listing], bool]) -> dict:
         stats = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0}
+        listings = list(listings)
+        stats["fetched"] = len(listings)
+        wanted = [l for l in listings if keep(l)]
+        for i, l in enumerate(wanted, 1):
+            self.progress(f"Valuing property {i} of {len(wanted)}: {l.address or l.url}")
+            stats["kept"] += 1
+            info = self.db.upsert_listing(l)
+            stats["new"] += info["new"]
+            l.raw["_price_reductions"] = info["reductions"]
+            a = self.analyse_listing(l)
+            self.db.upsert_listing(l)  # store lat/lon found during valuation
+            self.db.save_analysis(a)
+            if self._maybe_alert(l, a):
+                stats["alerts"] += 1
+        return stats
+
+    # ---- area search ----
+    def portal_inputs(self, s: Search) -> list[tuple[str, str, dict]]:
+        """(portal name, actor id, actor input) for each portal with a scraper set up."""
+        acfg = (self.cfg.get("sources") or {}).get("apify") or {}
+        field = acfg.get("url_field") or "startUrls"
+        base = dict(acfg.get("extra_input") or {})
+        max_items = int(acfg.get("max_items") or 100)
+        out = []
+        rm_actor = (acfg.get("rightmove_actor_id") or "").strip()
+        if rm_actor:
+            loc_id = rightmove_location_id(self.http, s.area)
+            if not loc_id:
+                raise SearchError(f"Rightmove doesn't recognise “{s.area}”. Check the postcode.")
+            out.append(("Rightmove", rm_actor,
+                        {**base, field: [{"url": rightmove_url(loc_id, s)}], "maxItems": max_items}))
+        zp_actor = (acfg.get("zoopla_actor_id") or "").strip()
+        if zp_actor:
+            out.append(("Zoopla", zp_actor, {**base, field: [{"url": zoopla_url(s)}], "maxItems": max_items}))
+        return out
+
+    def needs_fetch(self, s: Search) -> bool:
+        last = self.db.last_fetched(s.fetch_key)
+        if not last:
+            return True
+        return datetime.now(timezone.utc) - datetime.fromisoformat(last) > REFETCH_AFTER
+
+    def run_search(self, s: Search) -> dict:
+        if not s.area:
+            raise SearchError("Type a postcode or postcode district, e.g. BS5 6HN or M14.")
+        if not self.pc.locate(s.area if s.is_full_postcode else None, None if s.is_full_postcode else s.area):
+            raise SearchError(f"“{s.area}” isn't a UK postcode or postcode district we can find.")
+        if not env("APIFY_TOKEN"):
+            raise SearchError("Add your Apify token in Settings to search Rightmove and Zoopla.")
+        inputs = self.portal_inputs(s)
+        if not inputs:
+            raise SearchError("Add a Rightmove and/or Zoopla scraper ID in Settings.")
+        listings: list[Listing] = []
+        errors = []
+        for portal, actor, inp in inputs:
+            self.progress(f"Fetching listings from {portal} (this usually takes 1–3 minutes)…")
+            try:
+                found = self.apify_runner(actor, inp)
+                log.info("%s: %d listings", portal, len(found))
+                listings.extend(found)
+            except Exception as e:
+                log.error("%s scraper failed: %s", portal, e)
+                errors.append(f"{portal}: {e}")
+        if errors and not listings:
+            raise SearchError("The scraper didn't return any listings. " + "; ".join(errors))
+        stats = self.process(listings, search_filter(s))
+        stats["errors"] = errors
+        self.db.mark_fetched(s.fetch_key, s.to_dict(), stats["fetched"])
+        return stats
+
+    # ---- daily scan ----
+    def run(self) -> dict:
+        total = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0}
+
+        def add(stats):
+            for k in total:
+                total[k] += stats.get(k, 0)
+
         for source in self.sources:
             try:
-                listings = list(source.fetch())
+                add(self.process(source.fetch(), lambda l: passes_filters(l, self.cfg)))
             except Exception as e:
                 log.error("Source %s failed: %s", source.name, e)
-                continue
-            stats["fetched"] += len(listings)
-            for l in listings:
-                if not passes_filters(l, self.cfg):
-                    continue
-                stats["kept"] += 1
-                info = self.db.upsert_listing(l)
-                stats["new"] += info["new"]
-                l.raw["_price_reductions"] = info["reductions"]
-                a = self.analyse_listing(l)
-                self.db.upsert_listing(l)  # store lat/lon found during valuation
-                self.db.save_analysis(a)
-                if self._maybe_alert(l, a):
-                    stats["alerts"] += 1
-        log.info("Scan done: %s", stats)
-        return stats
+        for saved in self.db.saved_searches():
+            try:
+                add(self.run_search(Search.from_dict(saved)))
+            except Exception as e:
+                log.error("Saved search %s failed: %s", saved.get("area"), e)
+        log.info("Scan done: %s", total)
+        return total
 
     def _maybe_alert(self, l: Listing, a) -> bool:
         acfg = self.cfg.get("alerts") or {}

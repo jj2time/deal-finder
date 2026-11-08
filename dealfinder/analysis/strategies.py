@@ -5,6 +5,28 @@ import re
 
 from ..models import Analysis, Listing, StrategyMatch
 
+# Every deal type the app can flag, with the short explanation shown next to its tick box.
+STRATEGIES: dict[str, str] = {
+    "BMV": "Asking price below the median of nearby sold prices",
+    "Strong BTL": "High yield and positive monthly cashflow",
+    "Cash only": "Unmortgageable or cash buyers only",
+    "Refurb / BRRR": "Needs work; buy, refurbish, refinance, rent",
+    "Flip": "Refurb and resell for a profit",
+    "Repossession": "Lender / receiver sale",
+    "Probate": "Executor or deceased estate sale",
+    "Auction": "Sold by auction or modern method of auction",
+    "Short lease": "Under 85 years left on the lease",
+    "Motivated seller": "No chain, price reductions, quick sale",
+    "Negative equity": "Last sale price at or above today's asking price",
+    "Lease option candidate": "Little equity plus a seller who wants out",
+    "Problem property": "Subsidence, knotweed, fire damage, non-standard build",
+    "HMO potential": "4+ bedrooms or large floor area",
+    "Title split": "Freehold block or multiple flats on one title",
+    "Conversion / development": "Mixed use, planning, development opportunity",
+    "Serviced accommodation": "Holiday let / short-let potential",
+}
+STRATEGY_NAMES = list(STRATEGIES)
+
 KEYWORDS = {
     "repossession": ["repossess", "mortgagee", "lpa receiver", "receivers", "by order of the"],
     "cash_only": ["cash buyers only", "cash buyer only", "non-mortgageable", "unmortgageable",

@@ -17,14 +17,14 @@ filters:
 sources:
   apify:
     enabled: true
-    # One entry per saved search. Pick an actor in the Apify Store (search "Rightmove" or "Zoopla"),
-    # copy its ID (looks like username~actor-name) and the input JSON it expects.
-    runs:
-      - name: Rightmove BS5 houses
-        actor_id: "REPLACE-WITH-ACTOR-ID"
-        input:
-          startUrls: []          # e.g. - url: "https://www.rightmove.co.uk/property-for-sale/find.html?..."
-          maxItems: 100
+    # Area searches send Rightmove / Zoopla results-page links to these Apify scrapers.
+    # Pick scrapers in the Apify Store that accept search result page URLs; paste their IDs here
+    # (or on the Settings page).
+    rightmove_actor_id: ""
+    zoopla_actor_id: ""
+    max_items: 100            # per portal, per search
+    url_field: startUrls      # the scraper's input name for the list of URLs
+    extra_input: {}           # any other options the scraper needs
   email_alerts:
     enabled: false
     folder: INBOX

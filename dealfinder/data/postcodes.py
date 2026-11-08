@@ -65,3 +65,24 @@ class Postcodes:
             d = haversine_m(lat, lon, p["latitude"], p["longitude"])
             out.append((p["postcode"], d))
         return out
+
+    def ring(self, lat: float, lon: float, distance_m: float, points: int = 8) -> list[tuple[str, float]]:
+        """Postcodes around points on a circle round (lat, lon); distances are from (lat, lon).
+
+        postcodes.io returns at most 100 postcodes per lookup (about 400-500 m in a city), so
+        reaching further out means looking up several points around the centre.
+        """
+        out: dict[str, float] = {}
+        for i in range(points):
+            theta = 2 * math.pi * i / points
+            plat = lat + distance_m * math.cos(theta) / 111320
+            plon = lon + distance_m * math.sin(theta) / (111320 * math.cos(math.radians(lat)))
+            try:
+                r = self.http.request_json("GET", f"{BASE}/postcodes",
+                                           params={"lat": round(plat, 6), "lon": round(plon, 6),
+                                                   "radius": 2000, "limit": 100})
+            except Exception:
+                continue
+            for p in r.get("result") or []:
+                out[p["postcode"]] = haversine_m(lat, lon, p["latitude"], p["longitude"])
+        return list(out.items())
