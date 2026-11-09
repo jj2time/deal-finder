@@ -17,8 +17,16 @@ fail() {
   exit 1
 }
 
-# Already running? Just open the dashboard.
-if curl -fs -o /dev/null "$URL/health"; then open "$URL"; exit 0; fi
+# Already running? Open it — unless it's an older version, which is stopped and replaced.
+APP_VERSION="$(cat "$APP_DIR/VERSION" 2>/dev/null || echo unknown)"
+if RUNNING="$(curl -fs "$URL/health")"; then
+  case "$RUNNING" in
+    *"\"$APP_VERSION\""*) open "$URL"; exit 0 ;;
+  esac
+  echo "=== Replacing running version with $APP_VERSION $(date) ===" >>"$LOG"
+  curl -fs -X POST -o /dev/null "$URL/quit"
+  for _ in $(seq 1 20); do curl -fs -o /dev/null "$URL/health" || break; sleep 0.5; done
+fi
 
 VENV="$SUPPORT/venv"
 REQ_HASH="$(shasum "$APP_DIR/requirements.txt" | cut -c1-12)"

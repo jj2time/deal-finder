@@ -120,7 +120,9 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
 
     @app.get("/health")
     def health():
-        return {"ok": True}
+        from ..config import ROOT
+        v = ROOT / "VERSION"
+        return {"ok": True, "version": v.read_text().strip() if v.exists() else "dev"}
 
     def locate(s: Search):
         if not s.area:
