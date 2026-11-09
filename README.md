@@ -32,6 +32,11 @@ Rightmove yourself, click it on any results page and every listing on that page 
 6. Scores every deal 0–100, stores everything (so price drops and time on market are tracked) and emails you
    anything above your score threshold.
 
+**Deal posts.** Every property has a **Create deal post** button: an investor post (purchase price, refurb, GDV,
+money left in, equity, rent, cashflow) built from Deal Finder's numbers, editable, with one-click copy. Selling
+points like "quote provided" or "hands off" only appear when you tick them. Set your contact line and sourcing fee
+in Settings.
+
 Dashboard: ranked table, a filter button per strategy, map, detail page with the sold-price evidence,
 CSV export and a one-click PDF deal pack.
 

@@ -55,6 +55,8 @@
   .resultsbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   .thumb { width:64px; height:46px; object-fit:cover; border-radius:4px; float:left; margin-right:10px; }
   ul.plain { margin:0; padding-left:18px; } .tag.on { background:var(--accent); color:#fff; }
+  .postgrid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+  @media (max-width:900px) { .postgrid { grid-template-columns:1fr; } }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>

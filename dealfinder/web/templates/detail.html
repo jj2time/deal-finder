@@ -2,7 +2,8 @@
 {% set l = it.listing %}{% set a = it.analysis %}
 {% block title %}{{ l.address or "Deal" }}{% endblock %}
 {% block header %}<span style="flex:1"></span>
-<a class="btn" href="/deal/{{ l.key }}/pack.pdf">Deal pack PDF</a>
+<a class="btn" href="/deal/{{ l.key }}/post">Create deal post</a>
+<a class="btn alt" href="/deal/{{ l.key }}/pack.pdf">Deal pack PDF</a>
 {% if l.url %}<a class="btn alt" href="{{ l.url }}" target="_blank" rel="noopener">Open listing</a>{% endif %}{% endblock %}
 {% block content %}
 <div class="card">

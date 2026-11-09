@@ -102,6 +102,16 @@
   </div>
 </div>
 
+<div class="card"><h3>8. Deal posts</h3>
+  <p class="muted">Used by <b>Create deal post</b> on each property.</p>
+  <div class="form">
+    <label class="wide">Contact line at the end of posts<input name="marketing_contact" value="{{ mk.contact or '' }}" placeholder="e.g. Your name on 07…, or DM me"></label>
+    <label>Your sourcing fee £ <span class="muted">(added to costs)</span><input name="marketing_sourcing_fee" value="{{ mk.sourcing_fee or 0 }}"></label>
+  </div>
+  <p class="small" style="margin:12px 0 4px"><b>Ticked by default on new posts</b> <span class="muted">— only services you really provide</span></p>
+  {% for k, label in post_highlights.items() %}{% if k != 'quote' %}<label class="check"><input type="checkbox" name="marketing_highlights" value="{{ k }}" {% if k in (mk.default_highlights or []) %}checked{% endif %}> {{ label }}</label>{% endif %}{% endfor %}
+</div>
+
 <div class="card"><h3>7. Daily scan</h3>
   <div class="form"><label>Scan every day at<input name="daily_at" value="{{ cfg.schedule.daily_at }}" size="6"></label></div>
   <p class="muted">Runs while Deal Finder is open (it keeps running in the background after you close the browser tab).</p>

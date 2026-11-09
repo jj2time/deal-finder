@@ -88,6 +88,11 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
             th[key] = v
     cfg.setdefault("stamp_duty", {})["buyer_is_non_resident"] = bool(form.get("non_resident"))
 
+    mk = cfg.setdefault("marketing", {})
+    mk["contact"] = form.get("marketing_contact", "").strip()
+    mk["sourcing_fee"] = _num(form.get("marketing_sourcing_fee"), int) or 0
+    mk["default_highlights"] = [k for k in form.getlist("marketing_highlights")] if hasattr(form, "getlist") else []
+
     al = cfg.setdefault("alerts", {})
     al["enabled"] = bool(form.get("alerts_enabled"))
     al["to"] = form.get("alerts_to", "").strip()
@@ -218,6 +223,22 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         db.set_saved(s.fetch_key, s.to_dict(), form.get("saved") == "1")
         return RedirectResponse(f"/?{s.query_string()}", status_code=303)
 
+    @app.get("/deal/{key:path}/post", response_class=HTMLResponse)
+    def deal_post(request: Request, key: str):
+        from ..dealpost import HIGHLIGHTS, STRATEGY_LABELS, breakdown, build_numbers, write_post
+        item = db.result(key)
+        if not item:
+            raise HTTPException(404)
+        qp = request.query_params
+        form = {k: qp.get(k) for k in ("strategy", "location", "purchase", "refurb", "gdv", "rent", "legal",
+                                       "other_costs", "contact") if k in qp}
+        if "highlights" in qp:
+            form["highlights"] = [h for h in qp.getlist("highlights") if h]
+        d = build_numbers(item, state["cfg"], form)
+        return TEMPLATES.TemplateResponse(request, "post.html", ctx(
+            request, l=item["listing"], d=d, text=write_post(d), rows=breakdown(d),
+            highlights=HIGHLIGHTS, titles=STRATEGY_LABELS))
+
     @app.get("/deal/{key:path}/pack.pdf")
     def pack(key: str):
         item = db.result(key)
@@ -297,15 +318,18 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         envv = read_env()
         keys = {k: ("" if k in SECRET_KEYS else envv.get(k, "")) for k in ENV_KEYS}
         has_secret = {k: bool(envv.get(k)) for k in SECRET_KEYS}
+        from ..dealpost import HIGHLIGHTS
         return TEMPLATES.TemplateResponse(request, "settings.html", ctx(
-            request, cfg=cfg, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
+            request, cfg=cfg, post_highlights=HIGHLIGHTS, mk=cfg.get("marketing") or {}, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
             types=PROPERTY_TYPES, saved=saved, errors=[e for e in errors.split("|") if e]))
 
     @app.post("/settings")
     async def save_settings(request: Request):
-        form = dict(await request.form())
+        raw = await request.form()
+        form = dict(raw)
         cfg = state["cfg"]
         errors = apply_settings(cfg, form)
+        cfg["marketing"]["default_highlights"] = [h for h in raw.getlist("marketing_highlights") if h]
         save_config(cfg)
         env_values = {}
         for k in ENV_KEYS:

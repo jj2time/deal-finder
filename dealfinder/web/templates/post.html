@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Deal post · Deal Finder{% endblock %}
+{% block header %}<span class="muted">Deal post</span><span style="flex:1"></span><a class="btn alt" href="/deal/{{ l.key }}">Back to property</a>{% endblock %}
+{% block content %}
+<div class="postgrid">
+<form class="card" method="get" action="/deal/{{ l.key }}/post" id="postform">
+  <h3>{{ l.address }}</h3>
+  <p class="muted small">Numbers start from Deal Finder's analysis. Change anything, then press Update.</p>
+  <div class="form">
+    <label>Deal type<select name="strategy">{% for k, t in titles.items() %}<option value="{{ k }}" {% if k == d.strategy %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+    <label>Location<input name="location" value="{{ d.location }}"></label>
+    <label>Purchase price £<input name="purchase" value="{{ d.purchase }}" inputmode="numeric"></label>
+    <label>Refurb £<input name="refurb" value="{{ d.refurb }}" inputmode="numeric"></label>
+    <label>GDV (value after refurb) £<input name="gdv" value="{{ d.gdv }}" inputmode="numeric"></label>
+    <label>Rent £ pcm<input name="rent" value="{{ d.rent or '' }}" inputmode="numeric" placeholder="unknown"></label>
+    <label>Legal and survey £<input name="legal" value="{{ d.legal }}" inputmode="numeric"></label>
+    <label>Other costs £ <span class="muted">sourcing fee, bridging…</span><input name="other_costs" value="{{ d.other_costs }}" inputmode="numeric"></label>
+  </div>
+  <p class="small" style="margin:14px 0 4px"><b>Selling points</b> <span class="muted">— tick only what's true for this deal</span></p>
+  <input type="hidden" name="highlights" value="">
+  {% for k, label in highlights.items() %}<label class="check"><input type="checkbox" name="highlights" value="{{ k }}" {% if k in d.highlights %}checked{% endif %}> {{ label }}</label><br>{% endfor %}
+  <div class="form"><label class="wide">Contact line<input name="contact" value="{{ d.contact }}" placeholder="e.g. Your name on 07…  (set a default in Settings)"></label></div>
+  <div style="margin-top:12px"><button>Update</button></div>
+</form>
+
+<div>
+  <div class="card">
+    <h3>Your post</h3>
+    <textarea id="post" rows="18" style="font-size:15px; line-height:1.5">{{ text }}</textarea>
+    <div style="display:flex; gap:10px; margin-top:10px; align-items:center">
+      <button type="button" onclick="copyPost()">Copy post</button>
+      <a class="btn alt" href="/deal/{{ l.key }}/pack.pdf">Deal pack PDF</a>
+      <span class="muted small" id="copied"></span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>How the numbers work</h3>
+    <table>{% for label, v in rows %}<tr><td>{{ label }}</td><td class="num">{{ v }}</td></tr>{% endfor %}</table>
+    {% if d.comps %}<p class="muted small">GDV is based on {{ d.comps }} sold prices of similar properties nearby (HM Land Registry). Check the evidence on the property page before you post.</p>{% endif %}
+    <p class="muted small">Selling deals to other investors for a fee needs property redress scheme membership and HMRC anti-money-laundering supervision.</p>
+  </div>
+</div>
+</div>
+<script>
+  async function copyPost() {
+    const t = document.getElementById('post');
+    try { await navigator.clipboard.writeText(t.value); } catch (e) { t.select(); document.execCommand('copy'); }
+    document.getElementById('copied').textContent = 'Copied — paste it into WhatsApp, Facebook or Instagram.';
+  }
+</script>
+{% endblock %}
