@@ -232,3 +232,40 @@ def test_search_shows_progress_and_errors_immediately(tmp_path, monkeypatch, cfg
         time.sleep(0.05)
     page = client.get("/", params={"area": "ZZ1 1ZZ", "radius": 1}).text
     assert "The search didn't finish" in page and "a UK postcode or postcode district" in page
+
+
+def test_searches_are_remembered_and_can_be_saved(tmp_path, monkeypatch, cfg, token):
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    cfg["sources"]["apify"]["rightmove_actor_id"] = "someone/rightmove-scraper"
+    app = create_app(cfg)
+    client = TestClient(app)
+    app.state.settings["postcodes"] = FakePostcodes()
+    import dealfinder.pipeline as pipeline
+    real_init = pipeline.Scanner.__init__
+
+    def init(self, cfg, db=None, **kw):
+        real_init(self, cfg, db=db, http=FakeHTTP({"matches": [{"id": "1", "type": "POSTCODE",
+                                                                "displayName": "BS5 6AA"}]}),
+                  land_registry=FakeLR(), postcodes=FakePostcodes(), propertydata=FakePD(), sources=[],
+                  apify_runner=lambda a, i: fake_listings(), rightmove_reader=NoNetworkReader())
+    monkeypatch.setattr(pipeline.Scanner, "__init__", init)
+
+    assert "Your searches will appear here" in client.get("/").text
+    client.post("/search", data={"area": "BS5 6AA", "radius": "1", "max_price": "150000", "deal": "BMV"})
+    for _ in range(50):
+        if not client.get("/scan/status").json()["running"]:
+            break
+        time.sleep(0.1)
+    home = client.get("/").text
+    assert "within 1 mile of BS5 6AA, up to £150,000" in home and "3 found" in home   # remembered automatically
+    assert "Save (scan daily)" in home and "★" not in home.split("Your searches")[1]
+    # Save it from the list; we come back to the same page
+    r = client.post("/search/save", data={"area": "BS5 6AA", "radius": "1", "max_price": "150000",
+                                          "deal": "BMV", "saved": "1", "back": "/"}, follow_redirects=False)
+    assert r.headers["location"] == "/"
+    home = client.get("/").text
+    assert "★" in home and "Unsave" in home and "Run all ★ saved searches now" in home
+    # the link reopens the search with its ticks
+    link = home.split("Your searches")[1].split('<a href="')[1].split('"')[0].replace("&amp;", "&")
+    assert "deal=BMV" in link and "max_price=150000" in link
+    assert "3 propert" in client.get(link).text or "1 propert" in client.get(link).text

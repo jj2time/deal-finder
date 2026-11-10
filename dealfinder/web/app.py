@@ -23,6 +23,7 @@ from ..search import RADII_MILES, SORTS, Search, matches
 from .dealpack import build_pdf
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+TEMPLATES.env.filters["parse_qs"] = lambda q: __import__("urllib.parse", fromlist=["parse_qsl"]).parse_qsl(q)
 TEMPLATES.env.filters["money"] = lambda v: f"£{v:,.0f}" if isinstance(v, (int, float)) else "—"
 
 
@@ -174,6 +175,10 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == s.query_string(),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
+            recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
+                     "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
+                     "count": d["_count"], "form": Search.from_dict(d).query_string()}
+                    for d in db.recent_searches()],
             query=s.query_string(), batch=batch if batch_keys is not None else "",
             batch_count=len(batch_keys or []), bookmarklet=bookmarklet(str(request.base_url).rstrip("/"))))
 
@@ -222,7 +227,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         form = await request.form()
         s = Search.from_params(form.get, form.getlist)
         db.set_saved(s.fetch_key, s.to_dict(), form.get("saved") == "1")
-        return RedirectResponse(f"/?{s.query_string()}", status_code=303)
+        back = form.get("back") if str(form.get("back", "")).startswith("/") else f"/?{s.query_string()}"
+        return RedirectResponse(back, status_code=303)
 
     @app.get("/deal/{key:path}/post", response_class=HTMLResponse)
     def deal_post(request: Request, key: str):

@@ -125,6 +125,14 @@ class DB:
         return [{**json.loads(r["search"]), "_fetch_key": r["fetch_key"], "_last_fetched": r["last_fetched"]}
                 for r in self.conn.execute("SELECT * FROM searches WHERE saved=1 ORDER BY fetch_key")]
 
+    def recent_searches(self, limit: int = 12) -> list[dict]:
+        """Saved searches first, then the most recently run ones."""
+        rows = self.conn.execute(
+            "SELECT * FROM searches WHERE saved=1 OR last_fetched IS NOT NULL "
+            "ORDER BY saved DESC, last_fetched DESC LIMIT ?", (limit,)).fetchall()
+        return [{**json.loads(r["search"]), "_saved": bool(r["saved"]), "_last_fetched": r["last_fetched"],
+                 "_count": r["last_count"]} for r in rows]
+
     def is_saved(self, fetch_key: str) -> bool:
         row = self.conn.execute("SELECT saved FROM searches WHERE fetch_key=?", (fetch_key,)).fetchone()
         return bool(row and row["saved"])

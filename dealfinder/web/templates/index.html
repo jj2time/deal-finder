@@ -106,14 +106,27 @@
 </div>
 
 <div class="card">
-  <h3>Saved searches</h3>
+  <h3>Your searches</h3>
+  {% if recent %}
+  <table class="searches">
+    {% for r in recent %}
+    <tr>
+      <td>{% if r.saved %}<span title="Re-checked every day">★</span>{% endif %}</td>
+      <td><a href="/?{{ r.q }}">{{ r.label }}</a>{% if r.deals %}<br><span class="muted small">{{ r.deals|join(', ') }}</span>{% endif %}</td>
+      <td class="muted small">{% if r.when %}{{ r.when[:16]|replace('T',' ') }}{% if r.count is not none %} · {{ r.count }} found{% endif %}{% else %}not run yet{% endif %}</td>
+      <td class="num"><form method="post" action="/search/save" style="margin:0">
+        {% for k, v in r.form|parse_qs %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+        <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+        <input type="hidden" name="saved" value="{{ '0' if r.saved else '1' }}">
+        <button class="btn alt small">{{ 'Unsave' if r.saved else 'Save (scan daily)' }}</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
   {% if saved_searches %}
-  <ul class="plain">{% for ss in saved_searches %}
-    <li><a href="/?area={{ ss.area|urlencode }}&radius={{ ss.radius_miles }}{% if ss.min_price %}&min_price={{ ss.min_price }}{% endif %}{% if ss.max_price %}&max_price={{ ss.max_price }}{% endif %}{% if ss.min_beds %}&min_beds={{ ss.min_beds }}{% endif %}{% for t in ss.types %}&type={{ t|urlencode }}{% endfor %}{% for d in ss.deals %}&deal={{ d|urlencode }}{% endfor %}">{{ ss.area }}, {{ ss.radius_miles|string|replace('.0','') }} mi{% if ss.max_price %}, up to £{{ "{:,}".format(ss.max_price) }}{% endif %}{% if ss.deals %} — {{ ss.deals|join(', ') }}{% endif %}</a></li>
-  {% endfor %}</ul>
-  <form method="post" action="/scan" style="margin:8px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all saved searches now</button>
-    <span class="muted small">They also run automatically every day while Deal Finder is open.</span></form>
-  {% else %}<p class="muted">Search an area, then press <b>Save search</b> to have it re-checked every day.</p>{% endif %}
+  <form method="post" action="/scan" style="margin:10px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all ★ saved searches now</button>
+    <span class="muted small">★ searches also run automatically every day while Deal Finder is open.</span></form>
+  {% endif %}
+  {% else %}<p class="muted">Your searches will appear here automatically. Press <b>Save</b> on one to have it re-checked every day.</p>{% endif %}
   <form method="post" action="/upload" enctype="multipart/form-data" class="row" style="margin-top:14px">
     <label>Import an auction catalogue or any list (CSV)<input type="file" name="file" accept=".csv" required></label>
     <button class="btn alt">Import</button>
