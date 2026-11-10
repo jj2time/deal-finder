@@ -53,6 +53,11 @@ def test_town_from_address():
     assert town_from_address("Carsons Road, Greenbank, Bristol, BS5") == "Bristol"
     assert town_from_address("Strathcona Road, Liverpool, Merseyside, L15") == "Liverpool"
     assert town_from_address("") == ""
+    assert town_from_address("777 Ecclesall Road, Sheffield, South Yorkshire S11 8TH") == "Sheffield"
+    assert town_from_address("Flat 2, 25 Salisbury Road, Wavertree, Liverpool, L15 1HN") == "Liverpool"
+    assert town_from_address("Mossley Avenue, Mossley Hill, L18") == "Mossley Hill"
+    assert town_from_address("Hawthorn House, St. George, Bristol") == "Bristol"
+    assert town_from_address("High Street, Kettering, Northamptonshire NN16") == "Kettering"
 
 
 def test_post_page_and_settings(tmp_path, monkeypatch, cfg):

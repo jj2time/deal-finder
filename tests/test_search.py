@@ -204,3 +204,31 @@ def test_friendly_apify_errors():
     assert "can't find the scraper “a/b”" in friendly_error("api.apify.com answered 404: {}", "a/b")
     assert "out of credit" in friendly_error("api.apify.com answered 402: {}", "a/b")
     assert "5 minutes" in friendly_error("api.apify.com timed out", "a/b")
+
+
+def test_search_shows_progress_and_errors_immediately(tmp_path, monkeypatch, cfg):
+    """The page loaded right after pressing Search must show the progress box, and then any error."""
+    import threading
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    app = create_app(cfg)
+    client = TestClient(app)
+    app.state.settings["postcodes"] = FakePostcodes()
+    import dealfinder.pipeline as pipeline
+    gate = threading.Event()
+
+    def slow_fail(self, s):
+        gate.wait(5)
+        raise pipeline.SearchError("“ZZ1 1ZZ” isn't a UK postcode or postcode district we can find.")
+    monkeypatch.setattr(pipeline.Scanner, "run_search", slow_fail)
+    monkeypatch.setattr(pipeline.Scanner, "__init__", lambda self, cfg, db=None, **kw: None)
+    monkeypatch.setattr(pipeline.Scanner, "needs_fetch", lambda self, s: True)
+
+    r = client.post("/search", data={"area": "zz1 1zz", "radius": "1"})
+    assert "Searching within 1 mile of ZZ1 1ZZ" in r.text and "/scan/status" in r.text
+    gate.set()
+    for _ in range(50):
+        if not client.get("/scan/status").json()["running"]:
+            break
+        time.sleep(0.05)
+    page = client.get("/", params={"area": "ZZ1 1ZZ", "radius": 1}).text
+    assert "The search didn't finish" in page and "a UK postcode or postcode district" in page

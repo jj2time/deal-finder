@@ -41,12 +41,26 @@ def _int(v, default=None):
         return default
 
 
+POSTCODE_ANYWHERE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?(?:\s*\d[A-Z]{2})?\b", re.I)
+COUNTIES = {"merseyside", "greater manchester", "west midlands", "tyne and wear", "greater london",
+            "south yorkshire", "west yorkshire", "north yorkshire", "east yorkshire", "east riding of yorkshire",
+            "kent", "essex", "surrey", "east sussex", "west sussex", "norfolk", "suffolk", "devon", "cornwall",
+            "dorset", "somerset", "cumbria", "durham", "county durham", "northumberland", "rutland",
+            "isle of wight", "city of bristol", "bristol city", "south glamorgan", "west glamorgan", "gwent",
+            "clwyd", "dyfed", "gwynedd", "powys", "mid glamorgan", "uk", "united kingdom", "england", "wales"}
+
+
 def town_from_address(address: str | None) -> str:
-    """'Carsons Road, Greenbank, Bristol, BS5' -> 'Bristol'."""
-    parts = [p.strip() for p in (address or "").split(",") if p.strip()]
-    parts = [p for p in parts if not re.fullmatch(r"[A-Z]{1,2}\d[A-Z\d]?(\s*\d[A-Z]{2})?", p.upper())]
-    parts = [p for p in parts if p.lower() not in ("merseyside", "west yorkshire", "south yorkshire",
-                                                   "greater manchester", "west midlands", "tyne and wear")]
+    """'777 Ecclesall Road, Sheffield, South Yorkshire S11 8TH' -> 'Sheffield'."""
+    parts = []
+    for p in (address or "").split(","):
+        p = POSTCODE_ANYWHERE.sub("", p).strip(" .")
+        if not p or p.lower() in COUNTIES or p.lower().endswith("shire") or p.lower().startswith("county "):
+            continue
+        if re.match(r"^\d", p) or re.search(r"\b(road|street|lane|avenue|drive|close|way|court|place|crescent|"
+                                            r"terrace|grove|gardens|house|flat|apartment)\b", p, re.I):
+            continue   # street-level parts, not the town
+        parts.append(p.title() if p.isupper() else p)
     return parts[-1] if parts else ""
 
 

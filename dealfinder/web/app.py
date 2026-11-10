@@ -118,6 +118,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     db = DB(state["cfg"]["database"])
     app = FastAPI(title="Deal Finder")
     imports: dict[str, set[str]] = {}
+    job_lock = threading.Lock()
     scan_state = {"running": False, "last": None, "error": None, "query": None, "label": "", "progress": ""}
 
     def ctx(request, **kw):
@@ -274,12 +275,15 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                                  headers={"Content-Disposition": 'attachment; filename="deals.csv"'})
 
     def start_job(work, query: str = "", label: str = "Scanning"):
-        if scan_state["running"]:
-            return False
+        with job_lock:
+            if scan_state["running"]:
+                return False
+            # Marked as running before the page reloads, so the page always shows the progress box.
+            scan_state.update(running=True, error=None, last=None, query=query, label=label,
+                              progress=label + "…")
 
         def run():
             from ..pipeline import Scanner, SearchError
-            scan_state.update(running=True, error=None, query=query, label=label, progress=label + "…")
             try:
                 scanner = Scanner(state["cfg"], db=db)
                 scanner.progress = lambda m: scan_state.__setitem__("progress", m)

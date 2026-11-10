@@ -7,7 +7,7 @@
 {% if msg %}<div class="card ok">{{ msg }}</div>{% endif %}
 {% if needs_setup %}<div class="card ok"><b>Welcome.</b> Turn on the free Rightmove reader (or add an Apify scraper) in <a href="/settings">Settings</a> before searching.</div>{% endif %}
 {% if batch %}<div class="card ok"><b>{{ batch_count }} listings from your browser.</b> Tick deal types below and press Search to filter them, or <a href="/">start a new search</a>.</div>{% endif %}
-{% if scan.error and not scan.running %}<div class="card warn">{{ scan.error }}</div>{% endif %}
+{% if scan.error and not scan.running and (scan.query == query or scan.query == ('batch=' ~ batch) or not s.area) %}<div class="card warn"><b>The search didn't finish:</b> {{ scan.error }}</div>{% endif %}
 
 <form class="card" method="{{ 'get' if batch else 'post' }}" action="{{ '/' if batch else '/search' }}" id="search">
   {% if batch %}<input type="hidden" name="batch" value="{{ batch }}">{% endif %}
