@@ -10,3 +10,5 @@ pytest>=8.0
 respx>=0.21
 python-multipart>=0.0.9
 openpyxl>=3.1
+mcp>=2.3,<3
+pillow>=10

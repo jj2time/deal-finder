@@ -171,6 +171,16 @@
   <p class="muted small">Then search on rightmove.co.uk as usual. On any results page, click <b>Send to Deal Finder</b> in your bookmarks bar and every listing on that page is valued and checked for deal types here. Deal Finder must be open.</p>
 </div>
 
+<div class="card daily" id="daily">
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+    <h3 style="margin:0">Daily check: <span class="stage {{ 'stage-project-underway' if daily_on else '' }}">{{ 'ON' if daily_on else 'OFF' }}</span></h3>
+    <form method="post" action="/daily/toggle" style="margin:0"><button class="btn {{ 'alt' if daily_on }} small">{{ 'Turn off' if daily_on else 'Turn on' }}</button></form>
+    <form method="post" action="/daily/run" style="margin:0"><button class="btn alt small" {% if scan.running %}disabled{% endif %}>Run daily check now</button></form>
+    <a class="small" href="/settings#daily">time &amp; score settings</a>
+  </div>
+  <p class="muted small" style="margin:6px 0 0">{% if daily_on %}Every day at {{ daily_at }} (while Deal Finder is open) it checks your ★ saved searches — one Rightmove page each, no property pages — and lists only <b>new</b> deals above.{% else %}Off: nothing is checked automatically. Rightmove is only read when you press Search or “Run daily check now” (one page per ★ saved search).{% endif %}</p>
+</div>
+
 <div class="card">
   <h3>Your searches</h3>
   {% if recent %}
@@ -189,8 +199,7 @@
     {% endfor %}
   </table>
   {% if saved_searches %}
-  <form method="post" action="/scan" style="margin:10px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all ★ saved searches now</button>
-    <span class="muted small">{% if daily_on %}★ searches are also checked gently once a day (<a href="/settings#daily">daily check</a> is on).{% else %}The <a href="/settings#daily">daily check</a> is off, so nothing runs unless you ask.{% endif %}</span></form>
+  <form method="post" action="/scan" style="margin:10px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all ★ saved searches now (full)</button></form>
   {% endif %}
   {% else %}<p class="muted">Your searches will appear here automatically. Press <b>Save</b> to keep one at the top and include it in the optional <a href="/settings#daily">daily check</a>.</p>{% endif %}
   <form method="post" action="/upload" enctype="multipart/form-data" class="row" style="margin-top:14px">

@@ -49,7 +49,7 @@
 
 <div class="card" id="updates"><h3>⬆️ Updates</h3>
   <p class="muted small" style="margin-top:0">You're running version <b>{{ running_version.split('-')[0] }}</b>. Updates install from GitHub inside the app, so there's no download and no macOS security prompt.</p>
-  {% if not has_secret.GITHUB_TOKEN %}
+  {% if not has_secret.DEALFINDER_GITHUB_TOKEN %}
   <ol class="small">
     <li>On GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Settings → Developer settings → Fine-grained tokens → Generate new token</a>.</li>
     <li>Name it “Deal Finder updates”. Under <b>Repository access</b> choose <b>Only select repositories</b> → <b>deal-finder</b>.</li>
@@ -57,9 +57,9 @@
     <li>Click <b>Generate token</b>, copy it, paste it below and press <b>Save settings</b>.</li>
   </ol>
   {% endif %}
-  <div class="form"><label>GitHub access key {% if has_secret.GITHUB_TOKEN %}<span class="ok-text">saved ✓ (leave blank to keep)</span>{% endif %}
-    <input type="password" name="env_GITHUB_TOKEN" placeholder="github_pat_…"></label></div>
-  {% if has_secret.GITHUB_TOKEN %}
+  <div class="form"><label>GitHub access key {% if has_secret.DEALFINDER_GITHUB_TOKEN %}<span class="ok-text">saved ✓ (leave blank to keep)</span>{% endif %}
+    <input type="password" name="env_DEALFINDER_GITHUB_TOKEN" placeholder="github_pat_…"></label></div>
+  {% if has_secret.DEALFINDER_GITHUB_TOKEN %}
     {% if updates.error %}<p class="warntext small">{{ updates.error }}</p>{% endif %}
     {% if updates.info and updates.info.available %}
       <div class="card ok" style="margin:10px 0"><b>Update available: version {{ updates.info.latest.split('-')[0] }}</b> <span class="muted small">({{ updates.info.date }})</span>
@@ -71,6 +71,19 @@
     {% endif %}
     <button class="btn alt" formaction="/updates/check" formmethod="post" formnovalidate>Check for updates</button>
   {% endif %}
+</div>
+
+<div class="card" id="claude"><h3>📷 Photo analysis with Claude Desktop</h3>
+  <p class="muted" style="margin-top:0">Claude looks at a listing's photos and writes a condition report with a refurb estimate, using <b>your own Claude plan</b> — no extra cost. The report is saved on the property's page here.</p>
+  {% if request.query_params.get('claude') %}<div class="card ok">✓ Connected. <b>Quit Claude Desktop completely (Cmd+Q) and open it again</b> so it picks up Deal Finder.</div>{% endif %}
+  {% if request.query_params.get('claude_error') %}<div class="card warn">{{ request.query_params.get('claude_error') }}</div>{% endif %}
+  <ol class="small">
+    <li>Install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop app</a> and sign in.</li>
+    <li>Click <b>Connect to Claude Desktop</b> below, then quit Claude Desktop (Cmd+Q) and open it again.</li>
+    <li>In a new chat, type: <i>Analyse the photos of https://www.rightmove.co.uk/properties/…</i> (paste the listing link), or a property's address from Deal Finder. Claude asks once for permission to use Deal Finder's tools.</li>
+  </ol>
+  <p class="small">Status: {% if claude.connected %}<span class="ok-text">✓ connected to Claude Desktop</span>{% elif claude.installed %}Claude Desktop found, not connected yet{% else %}Claude Desktop not found on this Mac yet{% endif %}</p>
+  <button class="btn {{ 'alt' if claude.connected }}" formaction="/claude/connect" formmethod="post" formnovalidate>{{ 'Reconnect' if claude.connected else 'Connect to Claude Desktop' }}</button>
 </div>
 
 <div class="card" id="hot"><h3>🔥 Hot areas</h3>
@@ -149,7 +162,7 @@
   <p class="muted">Off unless you switch it on. Once a day it re-checks only your <b>★ saved searches</b>, as gently as possible: <b>one Rightmove results page per search and no individual property pages</b> (3 saved searches = 3 page views a day). It tells you only about listings that are <b>new</b>, match that search's ticked deal types, and score at least the level below — in a <b>🆕 New</b> list on the search page and a Mac notification.</p>
   <label class="check"><input type="checkbox" name="daily_enabled" {% if cfg.schedule and cfg.schedule.enabled %}checked{% endif %}> Do a daily check</label>
   <div class="form">
-    <label>Every day at<input name="daily_at" value="{{ cfg.schedule.daily_at if cfg.schedule else '07:30' }}" size="6"></label>
+    <label>Every day at<input name="daily_at" value="{{ (cfg.schedule.daily_at if cfg.schedule and cfg.schedule.daily_at else '07:30') }}" size="6"></label>
     <label>Only tell me about deals scoring at least<input name="daily_min_score" value="{{ (cfg.schedule.min_score if cfg.schedule and cfg.schedule.min_score is not none else 50) }}" size="4"></label>
   </div>
   <p class="muted small">Runs only while Deal Finder is open (it keeps running in the background after you close the browser tab).</p>

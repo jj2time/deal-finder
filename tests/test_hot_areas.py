@@ -231,11 +231,11 @@ def test_daily_check_off_by_default_and_settings(tmp_path, monkeypatch, cfg):
     s = Search(area="L15", radius_miles=1)
     from dealfinder.db import DB
     DB(cfg["database"]).set_saved(s.fetch_key, s.to_dict(), True)
-    assert "daily check</a> is off" in client.get("/").text
+    assert "Daily check: <span" in client.get("/").text and ">OFF<" in client.get("/").text
     client.post("/settings", data={"daily_enabled": "on", "daily_at": "07:30", "daily_min_score": "60"})
     assert app.state.settings["cfg"]["schedule"] == {**app.state.settings["cfg"]["schedule"], "enabled": True,
                                                      "min_score": 60}
     app.state.start_job = lambda work, q, label: started.append(q)
     jobs[0]()
     assert started == ["daily"]
-    assert "daily check</a> is on" in client.get("/").text
+    assert ">ON<" in client.get("/").text and "Turn off" in client.get("/").text

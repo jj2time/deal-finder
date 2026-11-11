@@ -25,6 +25,18 @@
   </div>
   {% for n in a.notes %}<p class="warn" style="margin:10px 0 0">{{ n }}</p>{% endfor %}
 </div>
+<div class="card" id="condition"><h3 style="margin-top:0">📷 Condition report</h3>
+  {% if report %}
+    <p class="muted small" style="margin-top:0">From Claude, based on the listing photos only — not a survey. Saved {{ report.saved_at[:16]|replace('T',' ') }} UTC.</p>
+    {% if report.refurb_low and report.refurb_high %}<p><b>Refurb estimate: £{{ "{:,}".format(report.refurb_low) }}–£{{ "{:,}".format(report.refurb_high) }}</b>
+      <a class="btn alt small" href="/deal/{{ l.key }}/post?refurb={{ ((report.refurb_low + report.refurb_high) / 2)|round|int }}">Use in deal post</a></p>{% endif %}
+    <div class="report">{{ report.report }}</div>
+  {% elif l.url and 'rightmove.co.uk/properties/' in l.url %}
+    <p class="muted" style="margin-top:0">No report yet. In Claude Desktop (connected in <a href="/settings#claude">Settings</a>), paste:</p>
+    <p><code id="ask">Analyse the photos of {{ l.url }}</code> <button type="button" class="btn alt small" onclick="navigator.clipboard.writeText(document.getElementById('ask').innerText); this.innerText='Copied'">Copy</button></p>
+  {% else %}<p class="muted">Photo analysis works for Rightmove listings.</p>{% endif %}
+</div>
+
 <div class="card"><h3 style="margin-top:0">Strategies</h3>
   {% if a.strategies %}<table>{% for s in a.strategies %}<tr><td><span class="tag">{{ s.name }}</span></td><td>{{ s.reason }}</td></tr>{% endfor %}</table>
   {% else %}<p class="muted">No strategy flagged.</p>{% endif %}

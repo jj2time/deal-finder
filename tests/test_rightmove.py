@@ -54,8 +54,9 @@ def test_parse_pages():
     props, total = parse_search_page(search_page([prop(1), prop(2)], 30))
     assert len(props) == 2 and total == 30
     d = parse_property_page(property_page(72))
-    assert d == {"tenure": "leasehold", "lease_years": 72, "floor_area_sqm": 50.0,
-                 "description": "Spacious flat.\nCash buyers only.", "key_features": ["LIFT"]}
+    assert {k: d[k] for k in ("tenure", "lease_years", "floor_area_sqm", "description", "key_features")} == {
+        "tenure": "leasehold", "lease_years": 72, "floor_area_sqm": 50.0,
+        "description": "Spacious flat.\nCash buyers only.", "key_features": ["LIFT"]}
     assert parse_property_page("<html>nothing</html>") == {}
     try:
         parse_search_page("<html>blocked</html>")

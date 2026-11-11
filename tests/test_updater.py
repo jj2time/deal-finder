@@ -104,20 +104,20 @@ def test_settings_and_routes(tmp_path, monkeypatch, cfg):
     from fastapi.testclient import TestClient
     from dealfinder.web.app import create_app
     monkeypatch.setattr(config, "HOME", tmp_path)
-    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("DEALFINDER_GITHUB_TOKEN", raising=False)
     app = create_app(cfg)
     client = TestClient(app)
     page = client.get("/settings").text
     assert "⬆️ Updates" in page and "Fine-grained tokens" in page and "Check for updates" not in page
-    monkeypatch.setenv("GITHUB_TOKEN", "tok")
+    monkeypatch.setenv("DEALFINDER_GITHUB_TOKEN", "tok")
     info = {"available": True, "latest": "abcdef1-20261112100000", "sha": "abcdef1234", "current": "dev",
             "date": "12 Nov 2026 10:00", "changes": ["Add update button"]}
     monkeypatch.setattr(up, "check", lambda repo: info)
-    client.post("/settings", data={"env_GITHUB_TOKEN": "tok", "daily_at": "07:30"})
+    client.post("/settings", data={"env_DEALFINDER_GITHUB_TOKEN": "tok", "daily_at": "07:30"})
     client.post("/updates/check")
     page = client.get("/settings").text
     assert "Update available: version abcdef1" in page and "Add update button" in page
-    assert "⬆️ Update available" in client.get("/").text                      # badge in the top bar
+    assert "⬆️ Update now" in client.get("/").text                            # one click, on every page
     installed = []
     monkeypatch.setattr(up, "install", lambda i, repo: installed.append(i["latest"]))
     monkeypatch.setattr(up, "restart_into_new_version", lambda: False)

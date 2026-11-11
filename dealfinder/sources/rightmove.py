@@ -87,7 +87,17 @@ def parse_property_page(html: str) -> dict[str, Any]:
         if isinstance(s, dict) and s.get("unit") == "sqm":
             sqm = s.get("minimumSize") or s.get("maximumSize")
     text = pd.get("text") or {}
+    addr = pd.get("address") or {}
+    postcode = f"{addr.get('outcode') or ''} {addr.get('incode') or ''}".strip() if addr.get("incode") else None
+    prices = pd.get("prices") or {}
     return {
+        "images": [{"url": i.get("url"), "caption": i.get("caption") or ""} for i in (pd.get("images") or [])
+                   if isinstance(i, dict) and str(i.get("url", "")).startswith("https://")],
+        "floorplans": [f.get("url") for f in (pd.get("floorplans") or [])
+                       if isinstance(f, dict) and str(f.get("url", "")).startswith("https://")],
+        "address": addr.get("displayAddress"),
+        "postcode": postcode,
+        "price_text": prices.get("primaryPrice"),
         "tenure": (tenure.get("tenureType") or "").lower() or None,
         "lease_years": parse_int(tenure.get("yearsRemainingOnLease")),
         "floor_area_sqm": float(sqm) if sqm else None,

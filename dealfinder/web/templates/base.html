@@ -88,6 +88,7 @@
   .stage-coming { background:#f9eeda; color:#8a5a00; } .stage-proposed { background:#efedff; color:#4b3fa8; }
   .stage-project-underway { background:#e7f1fb; color:#1b4f80; }
   table.hotlist th { white-space:nowrap; }
+  .report { white-space:pre-wrap; font-size:14px; line-height:1.55; background:var(--bg); border-radius:8px; padding:12px; max-height:640px; overflow:auto; }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>
@@ -95,10 +96,15 @@
 <body>
 <header><h1><a href="/">Deal Finder</a></h1>
 <nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a></nav>
-{% if update_available is defined and update_available %}<a class="busy" style="background:#e5f4e4;color:var(--accent);text-decoration:none" href="/settings#updates">⬆️ Update available</a>{% endif %}
+{% if app_version is defined %}
+  {% if update_available %}<form method="post" action="/updates/install" style="margin:0"><button class="btn small" title="Install the new version now">⬆️ Update now</button></form>
+  {% elif has_update_key %}<form method="post" action="/updates/check" style="margin:0"><input type="hidden" name="back" value="{{ request.url.path }}"><button class="btn alt small" title="Check GitHub for a newer version">⬆️ Check for updates · v{{ app_version.split('-')[0] }}</button></form>
+  {% else %}<a class="btn alt small" href="/settings#updates" title="One-time setup: add a GitHub key">⬆️ Set up updates · v{{ app_version.split('-')[0] }}</a>{% endif %}
+  {% if update_message %}<span class="small {{ 'warntext' if update_error else 'ok-text' }}">{{ update_message }}</span>{% endif %}
+{% endif %}
 {% if scan is defined and scan.running %}<span class="busy" title="{{ scan.progress }}"><span class="dot"></span> {{ scan.label }}{% if scan.queued %} (+{{ scan.queued|length }} waiting){% endif %}</span>{% endif %}
 {% block header %}{% endblock %}
-<form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? Daily scans pause until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
+<form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? It stops running in the background until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
 <main>{% block content %}{% endblock %}</main>
 <footer>Estimates only, not financial advice. Contains HM Land Registry data © Crown copyright and database right {{ year }}. This data is licensed under the Open Government Licence v3.0.</footer>
 </body>

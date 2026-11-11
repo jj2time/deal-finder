@@ -114,7 +114,8 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
     sch = cfg.setdefault("schedule", {})
     sch["enabled"] = bool(form.get("daily_enabled"))
     sch["min_score"] = _num(form.get("daily_min_score"), int) if form.get("daily_min_score") not in (None, "") else 50
-    t = form.get("daily_at", "07:30").strip()
+    # An empty box keeps the current time rather than refusing to save everything else.
+    t = (form.get("daily_at") or "").strip() or str(sch.get("daily_at") or "07:30")
     if re.fullmatch(r"\d{1,2}:\d{2}", t):
         cfg.setdefault("schedule", {})["daily_at"] = t
     else:
@@ -144,7 +145,11 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                   "queued": [], "errors": {}}
 
     def ctx(request, **kw):
-        return {"request": request, "year": date.today().year, "scan": scan_state,
+        us = getattr(app.state, "updates", None) or {}
+        flash = us.pop("flash", None) if request.method == "GET" else None
+        return {"request": request, "year": date.today().year, "scan": scan_state, "app_version": running_version,
+                "has_update_key": bool(env("DEALFINDER_GITHUB_TOKEN")),
+                "update_message": flash, "update_error": bool(us.get("error")) and bool(flash),
                 "update_available": bool((getattr(app.state, "updates", None) or {}).get("info", {}) and
                                          app.state.updates["info"].get("available")), **kw}
 
@@ -263,6 +268,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             hot=hot, hot_ticked=names, searches=searches, fetched=fetched, heads_up=heads_up,
             hotlist_entries=app.state.hotlist.all(), digest=db.digest() if not s.area and batch_keys is None else [],
             daily_on=bool((state["cfg"].get("schedule") or {}).get("enabled")),
+            daily_at=str((state["cfg"].get("schedule") or {}).get("daily_at", "07:30")),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
             recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
                      "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
@@ -360,7 +366,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         item = db.result(key)
         if not item:
             raise HTTPException(404)
-        return TEMPLATES.TemplateResponse(request, "detail.html", ctx(request, it=item))
+        from ..claude_connector import get_report
+        return TEMPLATES.TemplateResponse(request, "detail.html", ctx(request, it=item, report=get_report(db, key)))
 
     @app.get("/export.csv")
     def export(request: Request):
@@ -422,6 +429,21 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
 
     app.state.start_job = start_job
 
+    @app.post("/daily/toggle")
+    def daily_toggle():
+        cfg = state["cfg"]
+        sch = cfg.setdefault("schedule", {})
+        sch["enabled"] = not bool(sch.get("enabled"))
+        sch.setdefault("daily_at", "07:30")
+        sch.setdefault("min_score", 50)
+        save_config(cfg)
+        return RedirectResponse("/#daily", status_code=303)
+
+    @app.post("/daily/run")
+    def daily_run():
+        start_job(lambda sc: sc.daily_check(), "daily", "Daily check of your saved searches")
+        return RedirectResponse("/#daily", status_code=303)
+
     @app.post("/digest/clear")
     def digest_clear():
         db.clear_digest()
@@ -459,6 +481,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         from ..dealpost import HIGHLIGHTS
         return TEMPLATES.TemplateResponse(request, "settings.html", ctx(
             request, cfg=cfg, post_highlights=HIGHLIGHTS, updates=update_state, running_version=running_version,
+            claude=__import__("dealfinder.claude_connector", fromlist=["claude_desktop_status"]).claude_desktop_status(),
             hot_text="\n".join(f"{h['name']}, {h['area']}, {h['radius']:g}" for h in hot_areas(cfg)), mk=cfg.get("marketing") or {}, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
             types=PROPERTY_TYPES, saved=saved, errors=[e for e in errors.split("|") if e]))
 
@@ -499,14 +522,20 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         from datetime import datetime
         update_state["checked"] = datetime.now().strftime("%H:%M")
 
-    if env("GITHUB_TOKEN"):     # quietly look for an update when Deal Finder starts
+    if env("DEALFINDER_GITHUB_TOKEN"):     # quietly look for an update when Deal Finder starts
         threading.Thread(target=check_updates, daemon=True).start()
     app.state.updates = update_state
 
     @app.post("/updates/check")
-    def updates_check():
+    async def updates_check(request: Request):
+        form = await request.form()
         check_updates()
-        return RedirectResponse("/settings#updates", status_code=303)
+        info = update_state.get("info") or {}
+        update_state["flash"] = (update_state["error"] if update_state.get("error") else
+                                 f"Version {info.get('latest', '').split('-')[0]} is ready — click Update now"
+                                 if info.get("available") else "✓ You're up to date")
+        back = form.get("back") if str(form.get("back", "")).startswith("/") else "/settings#updates"
+        return RedirectResponse(back, status_code=303)
 
     @app.post("/updates/install")
     def updates_install():
@@ -529,6 +558,17 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     def updating(request: Request):
         return TEMPLATES.TemplateResponse(request, "updating.html", ctx(request, updates=update_state,
                                                                        running_version=running_version))
+
+    # ---- Claude Desktop photo analysis ----
+    @app.post("/claude/connect")
+    def claude_connect():
+        from ..claude_connector import connect_claude_desktop
+        try:
+            connect_claude_desktop()
+            return RedirectResponse("/settings?claude=connected#claude", status_code=303)
+        except Exception as e:
+            from urllib.parse import quote
+            return RedirectResponse(f"/settings?claude_error={quote(str(e)[:300])}#claude", status_code=303)
 
     @app.post("/quit")
     def quit_app():

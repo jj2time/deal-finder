@@ -66,7 +66,7 @@ VENV="$SUPPORT/venv"
 REQ_HASH="$(shasum "$APP_DIR/requirements.txt" | cut -c1-12)"
 STAMP="$VENV/.installed-$REQ_HASH"
 if [ ! -f "$STAMP" ]; then
-  notify "Setting up for the first time. This takes a few minutes; your browser opens when it's ready."
+  notify "Setting up (first install or an update needing new parts). This takes a few minutes; your browser opens when it's ready."
   echo "=== Setup $(date) ===" >>"$LOG"
   UV="$(find "$SUPPORT/uv" -type f -name uv -perm -u+x 2>/dev/null | head -1)"
   if [ -z "$UV" ]; then

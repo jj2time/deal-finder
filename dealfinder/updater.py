@@ -62,7 +62,7 @@ def _get(c: httpx.Client, url: str) -> httpx.Response:
 
 def check(repo: str = DEFAULT_REPO, token: str | None = None, client: httpx.Client | None = None) -> dict[str, Any]:
     """What's on GitHub compared with what's running."""
-    token = token or env("GITHUB_TOKEN")
+    token = token or env("DEALFINDER_GITHUB_TOKEN")
     if not token:
         raise UpdateError("Add a GitHub access key in Settings first.")
     c = _client(token, client)
@@ -101,7 +101,7 @@ def _safe_extract(zf: zipfile.ZipFile, dest: Path) -> Path:
 def install(info: dict, repo: str = DEFAULT_REPO, token: str | None = None, client: httpx.Client | None = None,
             home: Path | None = None) -> Path:
     """Downloads info['sha'] and makes it the current copy. Returns its folder."""
-    token = token or env("GITHUB_TOKEN")
+    token = token or env("DEALFINDER_GITHUB_TOKEN")
     if not token:
         raise UpdateError("Add a GitHub access key in Settings first.")
     home = home or HOME
