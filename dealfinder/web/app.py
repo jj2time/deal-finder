@@ -186,9 +186,14 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         shown.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
         counts = {name: sum(1 for it in shown if name in {m["name"] for m in it["analysis"]["strategies"]})
                   for name in STRATEGIES}
-        points = [{"lat": it["listing"]["lat"], "lon": it["listing"]["lon"], "key": it["listing"]["key"],
-                   "label": f"{it['listing'].get('address')} — {it['analysis']['score']}"}
-                  for it in shown if it["listing"].get("lat") and it["listing"].get("lon")]
+        def money(v):
+            return f"£{v:,.0f}" if isinstance(v, (int, float)) else "—"
+        points = [{"n": n, "lat": it["listing"]["lat"], "lon": it["listing"]["lon"], "key": it["listing"]["key"],
+                   "address": it["listing"].get("address") or "Unknown address",
+                   "price": money(it["listing"].get("price")), "value": money(it["analysis"].get("market_value")),
+                   "bmv": it["analysis"].get("bmv_pct"), "score": it["analysis"]["score"],
+                   "beds": it["listing"].get("bedrooms")}
+                  for n, it in enumerate(shown, 1) if it["listing"].get("lat") and it["listing"].get("lon")]
         srcs = state["cfg"].get("sources", {})
         acfg = srcs.get("apify") or {}
         free_on = (srcs.get("rightmove") or {}).get("enabled", True)

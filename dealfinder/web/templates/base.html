@@ -67,6 +67,22 @@
   .busy .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#1b4f80; animation:spin 1s linear infinite alternate; }
   table.hotlist td { vertical-align:top; } .nowrap { white-space:nowrap; }
   details.card > summary { cursor:pointer; list-style-position:outside; }
+  ol.proplist { list-style:none; margin:0; padding:0; }
+  .prop { display:flex; gap:14px; padding:14px 0; border-top:1px solid var(--line); position:relative; scroll-margin-top:80px; }
+  .prop.hl { background:#fff8e6; }
+  .prop .pin, .numpin span { display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:13px; flex:none; }
+  .numpin { background:none; border:none; } .numpin span { box-shadow:0 1px 4px rgba(0,0,0,.4); border:2px solid #fff; }
+  .prop .photo { width:180px; height:125px; object-fit:cover; border-radius:6px; flex:none; background:var(--bg); }
+  .prop .nophoto { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; }
+  .prop .info { flex:1; min-width:0; }
+  .prop .top { display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+  .prop .addr { font-weight:600; font-size:15px; }
+  .prop .figs { display:grid; grid-template-columns:repeat(auto-fit, minmax(95px,1fr)); gap:6px 12px; margin:8px 0; }
+  .prop .figs div { display:flex; flex-direction:column; } .prop .figs b.good { color:var(--accent); }
+  .prop .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .warntext { color:var(--warn); margin-top:4px; }
+  @media (max-width:700px) { .prop { flex-wrap:wrap; } .prop .photo { width:100%; height:180px; } }
+  @media (max-width:700px) { table.hotlist, table.hotlist tbody, table.hotlist tr, table.hotlist td { display:block; } table.hotlist tr { border-top:1px solid var(--line); padding:8px 0; } table.hotlist td { border:0; padding:2px 0; text-align:left; } .nowrap { white-space:normal; } }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>

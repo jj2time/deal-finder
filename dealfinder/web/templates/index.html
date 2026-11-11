@@ -90,31 +90,36 @@
 <div class="card" style="background:#f9ece7; border-color:#efd3c6">🔥 <b>Heads-up for {{ area }}</b>{% if councils|length > 1 %} <span class="muted small">(covers {{ councils|join(', ') }})</span>{% endif %}: <a href="/hotlist#e-{{ e.id }}">{{ e.title }}</a> — {{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}
   {% if e.impact %}<br><span class="small">{{ e.impact }}</span>{% endif %}</div>
 {% endfor %}
-{% if points %}<div class="card" id="mapcard"><div id="map"></div></div>{% endif %}
-
-{% if (searches or batch) and items %}
-<div class="card scroll">
-<table>
-  <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Area value</th><th class="num">BMV</th>
-  <th class="num">Yield</th><th class="num">Cashflow</th><th>Deal types</th><th>Source</th></tr></thead>
-  <tbody>
+{% if items %}
+<div class="card results" id="results">
+  {% if not searches and not batch %}<p style="margin:0 0 10px"><b>{{ items|length }} propert{{ 'y' if items|length == 1 else 'ies' }}</b></p>{% endif %}
+  {% if points %}<div id="mapcard"><div id="map"></div><p class="muted small" style="margin:6px 0 12px">Numbers on the map match the list below. Click a pin for details.</p></div>{% endif %}
+  <ol class="proplist">
   {% for it in items %}{% set l = it.listing %}{% set a = it.analysis %}
-  <tr>
-    <td><span class="score {% if a.score < 40 %}low{% elif a.score < 65 %}mid{% endif %}">{{ a.score }}</span></td>
-    <td>{% if l.image %}<img class="thumb" src="{{ l.image }}" alt="" loading="lazy">{% endif %}
-      <a href="/deal/{{ l.key }}">{{ l.address or "Unknown address" }}</a><br>
-      <span class="muted">{{ l.bedrooms or "?" }} bed {{ l.property_type }} · {{ l.postcode or l.outcode or "no postcode" }}</span></td>
-    <td class="num">{{ l.price|money }}</td>
-    <td class="num">{{ a.market_value|money }}<br><span class="muted">{{ a.valuation_comps }} sales</span></td>
-    <td class="num">{% if a.bmv_pct is not none %}{{ a.bmv_pct }}%{% else %}—{% endif %}</td>
-    <td class="num">{% if a.gross_yield_pct is not none %}{{ a.gross_yield_pct }}%{% else %}—{% endif %}</td>
-    <td class="num">{{ a.monthly_cashflow|money }}</td>
-    <td>{% for m in a.strategies %}<span class="tag {% if m.name in s.deals %}on{% endif %}" title="{{ m.reason }}">{{ m.name }}</span>{% endfor %}</td>
-    <td>{% if l.url %}<a href="{{ l.url }}" target="_blank" rel="noopener">{{ l.source }}</a>{% else %}{{ l.source }}{% endif %}</td>
-  </tr>
+    <li class="prop" id="p-{{ loop.index }}">
+      <span class="pin">{{ loop.index }}</span>
+      {% if l.image %}<img class="photo" src="{{ l.image }}" alt="" loading="lazy" onerror="this.outerHTML='<div class=&quot;photo nophoto&quot;>No photo</div>'">{% else %}<div class="photo nophoto">No photo</div>{% endif %}
+      <div class="info">
+        <div class="top"><a class="addr" href="/deal/{{ l.key }}">{{ l.address or "Unknown address" }}</a>
+          <span class="score {% if a.score < 40 %}low{% elif a.score < 65 %}mid{% endif %}" title="Deal score">{{ a.score }}</span></div>
+        <div class="muted small">{{ l.bedrooms or "?" }} bed {{ l.property_type }} · {{ l.postcode or l.outcode or "no postcode" }}{% if l.tenure %} · {{ l.tenure }}{% endif %}{% if l.lease_years %} · {{ l.lease_years }} yrs lease{% endif %}</div>
+        <div class="figs">
+          <div><span class="muted small">Asking</span><b>{{ l.price|money }}</b></div>
+          <div><span class="muted small">Area value</span><b>{{ a.market_value|money }}</b><span class="muted small">{{ a.valuation_comps }} sales</span></div>
+          <div><span class="muted small">BMV</span><b class="{{ 'good' if a.bmv_pct and a.bmv_pct >= 15 }}">{% if a.bmv_pct is not none %}{{ a.bmv_pct }}%{% else %}—{% endif %}</b></div>
+          <div><span class="muted small">Yield</span><b>{% if a.gross_yield_pct is not none %}{{ a.gross_yield_pct }}%{% else %}—{% endif %}</b></div>
+          <div><span class="muted small">Cashflow</span><b>{{ a.monthly_cashflow|money }}</b></div>
+          <div><span class="muted small">Stamp duty</span><b>{{ a.stamp_duty|money }}</b></div>
+        </div>
+        <div>{% for m in a.strategies %}<span class="tag {% if m.name in s.deals %}on{% endif %}" title="{{ m.reason }}">{{ m.name }}</span>{% endfor %}</div>
+        {% if a.comparison_warning %}<div class="small warntext">{{ a.comparison_warning }}</div>{% endif %}
+        <div class="actions"><a class="btn small" href="/deal/{{ l.key }}">Full details</a>
+          <a class="btn alt small" href="/deal/{{ l.key }}/post">Deal post</a>
+          {% if l.url %}<a class="btn alt small" href="{{ l.url }}" target="_blank" rel="noopener">View on {{ l.source|capitalize }}</a>{% endif %}</div>
+      </div>
+    </li>
   {% endfor %}
-  </tbody>
-</table>
+  </ol>
 </div>
 {% elif searches and fetched|selectattr(1)|list and not scan.running %}
 <div class="card muted">No properties match. Try a bigger radius, fewer deal types, or a wider price range.</div>
@@ -188,8 +193,16 @@
   const pts = {{ points|tojson }};
   const map = L.map('map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 18, attribution: '© OpenStreetMap contributors'}).addTo(map);
-  const group = L.featureGroup(pts.map(p => L.marker([p.lat, p.lon]).bindPopup(`<a href="/deal/${encodeURI(p.key)}">${p.label}</a>`))).addTo(map);
-  map.fitBounds(group.getBounds().pad(0.2));
+  const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const markers = pts.map(p => {
+    const icon = L.divIcon({className: 'numpin', html: `<span>${p.n}</span>`, iconSize: [28, 28], iconAnchor: [14, 14]});
+    return L.marker([p.lat, p.lon], {icon}).bindPopup(
+      `<b>${p.n}. ${esc(p.address)}</b><br>${p.beds ? p.beds + ' bed · ' : ''}Asking ${p.price} · value ${p.value}` +
+      `${p.bmv != null ? ' · ' + p.bmv + '% BMV' : ''}<br>Score ${p.score} · <a href="/deal/${encodeURI(p.key)}">Full details</a> · <a href="#p-${p.n}">In the list</a>`)
+      .on('click', () => { const li = document.getElementById('p-' + p.n); document.querySelectorAll('.prop.hl').forEach(x => x.classList.remove('hl')); if (li) li.classList.add('hl'); });
+  });
+  const group = L.featureGroup(markers).addTo(map);
+  map.fitBounds(group.getBounds().pad(0.2), {maxZoom: 16});
   }
 </script>
 {% endif %}
