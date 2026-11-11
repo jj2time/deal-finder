@@ -14,6 +14,61 @@ from datetime import date
 from typing import Any
 
 CATEGORIES = ["Article 4 coming", "Article 4 in force", "Major project", "Regeneration", "Other"]
+STAGES = ["In force", "Expansion", "Coming", "Proposed", "Project underway"]
+
+# Stage, exact areas covered, and the page that explains each starting entry. Filled into entries saved
+# before these fields existed (matched by title), and used when the person hasn't set their own.
+SEED_EXTRA = {
+    "Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)": {
+        "stage": "In force",
+        "where": ("Former wards of Anfield, Central, Greenbank, Kensington and Fairfield, Picton, Princes Park, "
+                  "Riverside, Tuebrook and Stoneycroft, and Wavertree, plus parts of Church and Kirkdale "
+                  "(and the Dales area of Greenbank since 2018)"),
+        "link": "https://liverpool.gov.uk/planning-and-building-control/planning-permission/planning-permission-for-hmos/",
+    },
+    "Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)": {
+        "stage": "Expansion",
+        "where": ("Now (if upheld): Kirkdale, Everton, County, Walton, Orrell Park, part of Fazakerley, part of "
+                  "Tuebrook Larkhill, Old Swan, part of Stoneycroft, Penny Lane, part of Calderstones, and "
+                  "St Michaels and Sefton Park. From about Oct 2027: the rest of Liverpool"),
+        "link": "https://www.birkenhead.news/liverpool-council-to-strengthen-hmo-powers/",
+    },
+    "Preston: HMO Article 4": {
+        "stage": "Coming",
+        "where": "Preston (the council's map shows the exact streets covered)",
+        "link": "https://www.preston.gov.uk/article/12132/Article-4-Direction-on-HMOs",
+    },
+    "Hertsmere (Potters Bar): HMO Article 4": {
+        "stage": "Coming",
+        "where": "Potters Bar",
+        "link": "https://www.hertsmere.gov.uk/news/residents-invited-to-comment-on-proposed-article-4-direction-in-relation-to-hmos-in-potters-bar",
+    },
+    "North Tyneside: HMO Article 4 in eight wards": {
+        "stage": "Coming",
+        "where": "Eight North Tyneside wards (ward names in the linked article)",
+        "link": "https://www.planninggeek.co.uk/2026/north-tyneside-hmo-article-4/",
+    },
+    "Burnley: HMO Article 4 extending to six more wards": {
+        "stage": "Expansion",
+        "where": "Six more Burnley wards on top of those already covered (ward names in the linked article)",
+        "link": "https://www.planninggeek.co.uk/2026/burnley-hmo-article-4-made/",
+    },
+    "Bury: borough-wide HMO Article 4": {
+        "stage": "In force",
+        "where": "The whole of Bury borough",
+        "link": "https://www.bury.gov.uk/planning-building-control/planning-permission/article-4-directions",
+    },
+    "Sizewell C nuclear power station (Suffolk)": {
+        "stage": "Project underway",
+        "where": "Sizewell, near Leiston (IP16); knock-on demand in Saxmundham (IP17) and Ipswich",
+        "link": "https://www.newcivilengineer.com/latest/sizewell-c-has-awarded-almost-1bn-in-local-contracts-at-two-year-mark-of-construction-16-01-2026/",
+    },
+}
+
+
+def default_stage(category: str) -> str:
+    return {"Article 4 in force": "In force", "Article 4 coming": "Coming",
+            "Major project": "Project underway"}.get(category, "")
 
 SEED_VERSION = 2
 # Seed entries replaced in later versions (removed only if the person never edited them).
@@ -217,6 +272,9 @@ def clean_entry(d: dict) -> dict:
         "impact": str(d.get("impact") or "").strip(),
         "sources": [s for s in sources if isinstance(s, dict) and str(s.get("url", "")).startswith("http")],
         "checked": str(d.get("checked") or date.today().isoformat()),
+        "stage": d.get("stage") if d.get("stage") in STAGES else "",
+        "where": str(d.get("where") or "").strip(),
+        "link": str(d.get("link") or "").strip() if str(d.get("link") or "").startswith("http") else "",
     }
 
 
@@ -247,14 +305,27 @@ class HotList:
         self.conn.execute("INSERT OR REPLACE INTO meta VALUES ('hotlist_seed', ?)", (str(SEED_VERSION),))
         self.conn.commit()
 
+    @staticmethod
+    def _complete(e: dict) -> dict:
+        """Fill stage / where / link for entries saved before those fields existed."""
+        extra = SEED_EXTRA.get(e.get("title"), {})
+        for k in ("stage", "where", "link"):
+            if not e.get(k):
+                e[k] = extra.get(k, "")
+        if not e.get("stage"):
+            e["stage"] = default_stage(e.get("category", ""))
+        if not e.get("link") and e.get("sources"):
+            e["link"] = e["sources"][0]["url"]
+        return e
+
     def all(self) -> list[dict]:
-        out = [json.loads(r[0]) for r in self.conn.execute("SELECT data FROM hotlist")]
+        out = [self._complete(json.loads(r[0])) for r in self.conn.execute("SELECT data FROM hotlist")]
         order = {c: i for i, c in enumerate(CATEGORIES)}
         return sorted(out, key=lambda e: (order.get(e["category"], 99), e["title"].lower()))
 
     def get(self, entry_id: str) -> dict | None:
         r = self.conn.execute("SELECT data FROM hotlist WHERE id=?", (entry_id,)).fetchone()
-        return json.loads(r[0]) if r else None
+        return self._complete(json.loads(r[0])) if r else None
 
     def save(self, entry: dict) -> dict:
         entry = clean_entry(entry)

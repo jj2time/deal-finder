@@ -13,10 +13,13 @@
   <div class="form">
     <label class="wide">Title<input name="title" value="{{ editing.title or '' }}" required placeholder="e.g. Leeds: HMO Article 4 in Headingley"></label>
     <label>Category<select name="category">{% for c in categories %}<option {% if c == editing.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Stage<select name="stage"><option value="">—</option>{% for st in stages %}<option {% if st == editing.stage %}selected{% endif %}>{{ st }}</option>{% endfor %}</select></label>
     <label>Key date<input name="key_date" value="{{ editing.key_date or '' }}" placeholder="2027-10-01 or October 2027"></label>
     <label>Councils <span class="muted">comma-separated, as on gov.uk</span><input name="councils" value="{{ (editing.councils or [])|join(', ') }}" placeholder="Liverpool, Sefton"></label>
     <label>Postcodes to search <span class="muted">comma-separated</span><input name="postcodes" value="{{ (editing.postcodes or [])|join(', ') }}" placeholder="L15, L9 8BX"></label>
     <label class="wide">Status<input name="status" value="{{ editing.status or '' }}"></label>
+    <label class="wide">Where exactly <span class="muted">areas, wards or streets it covers</span><textarea name="where" rows="2">{{ editing.where or '' }}</textarea></label>
+    <label class="wide">Details link <span class="muted">the page that explains it</span><input name="link" value="{{ editing.link or '' }}" placeholder="https://…"></label>
     <label class="wide">What's happening<textarea name="summary" rows="3">{{ editing.summary or '' }}</textarea></label>
     <label class="wide">What it means for investors<textarea name="impact" rows="2">{{ editing.impact or '' }}</textarea></label>
     <label class="wide">Sources <span class="muted">one per line: title | link</span><textarea name="sources" rows="3">{% for src in editing.sources or [] %}{{ src.title }} | {{ src.url }}
@@ -31,11 +34,13 @@
 {% for e in group %}
 <div class="card" id="e-{{ e.id }}">
   <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap">
-    <div style="flex:1 1 300px"><b style="font-size:16px">{{ e.title }}</b>
+    <div style="flex:1 1 300px"><span class="stage stage-{{ e.stage|lower|replace(' ', '-') }}">{{ e.stage or '—' }}</span> <b style="font-size:16px">{{ e.title }}</b>
       <p class="small" style="margin:4px 0">{{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}</p></div>
+    {% if e.link %}<a class="btn small" href="{{ e.link }}" target="_blank" rel="noopener">Read more ↗</a>{% endif %}
     <a class="btn alt small" href="/hotlist?edit={{ e.id }}#form">Edit</a>
     <form method="post" action="/hotlist" style="margin:0" onsubmit="return confirm('Delete this entry?')"><input type="hidden" name="delete" value="{{ e.id }}"><button class="btn alt small">Delete</button></form>
   </div>
+  {% if e.where %}<p style="margin:6px 0"><b>Where:</b> {{ e.where }}</p>{% endif %}
   <p style="margin:6px 0">{{ e.summary }}</p>
   {% if e.impact %}<p style="margin:6px 0"><b>For investors:</b> {{ e.impact }}</p>{% endif %}
   <div class="row" style="margin-top:6px">

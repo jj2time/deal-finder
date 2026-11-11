@@ -129,16 +129,21 @@
   <summary><h3 style="display:inline">🔥 Hot list</h3> <span class="muted small">— areas with something going on ({{ hotlist_entries|length }})</span></summary>
   <p class="muted small" style="margin:6px 0 10px">Article 4 restrictions coming in, big projects, regeneration. Searches in these councils show a heads-up. Dates change — check with the council.
     <a href="/hotlist?new=1#form">Add an entry</a> · <a href="/hotlist">Full details and editing</a></p>
-  <table class="hotlist">
+  <div class="scroll"><table class="hotlist">
+  <thead><tr><th>Stage</th><th>What</th><th>Where</th><th>When</th><th>Details</th></tr></thead>
+  <tbody>
   {% for e in hotlist_entries %}
     <tr>
-      <td><span class="tag {{ 'on' if 'Article 4' in e.category else '' }}">{{ e.category }}</span></td>
+      <td><span class="stage stage-{{ e.stage|lower|replace(' ', '-') }}">{{ e.stage or '—' }}</span><br><span class="muted small">{{ e.category }}</span></td>
       <td><a href="/hotlist#e-{{ e.id }}"><b>{{ e.title }}</b></a><br><span class="muted small">{{ e.status }}</span></td>
-      <td class="small nowrap">{{ e.key_date }}</td>
-      <td class="num">{% for pc in e.postcodes[:3] %}<form method="post" action="/search" style="display:inline"><input type="hidden" name="area" value="{{ pc }}"><input type="hidden" name="radius" value="{{ '0.5' if ' ' in pc else '1' }}">{% for k in ['detached','semi-detached','terraced','flat','other'] %}<input type="hidden" name="type" value="{{ k }}">{% endfor %}<button class="btn alt small">{{ pc }}</button></form> {% endfor %}</td>
+      <td class="small">{{ e.where or '—' }}</td>
+      <td class="small">{{ e.key_date }}</td>
+      <td class="nowrap">{% if e.link %}<a class="btn alt small" href="{{ e.link }}" target="_blank" rel="noopener">Read more ↗</a>{% endif %}
+        <div style="margin-top:4px">{% for pc in e.postcodes[:3] %}<form method="post" action="/search" style="display:inline"><input type="hidden" name="area" value="{{ pc }}"><input type="hidden" name="radius" value="{{ '0.5' if ' ' in pc else '1' }}">{% for k in ['detached','semi-detached','terraced','flat','other'] %}<input type="hidden" name="type" value="{{ k }}">{% endfor %}<button class="btn alt small" title="Search {{ pc }}">{{ pc }}</button></form> {% endfor %}</div></td>
     </tr>
-  {% else %}<tr><td class="muted">Nothing yet. <a href="/hotlist?new=1#form">Add an area</a>.</td></tr>{% endfor %}
-  </table>
+  {% else %}<tr><td colspan="5" class="muted">Nothing yet. <a href="/hotlist?new=1#form">Add an area</a>.</td></tr>{% endfor %}
+  </tbody>
+  </table></div>
 </details>
 
 <div class="card">

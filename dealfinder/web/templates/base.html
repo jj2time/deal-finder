@@ -82,7 +82,12 @@
   .prop .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .warntext { color:var(--warn); margin-top:4px; }
   @media (max-width:700px) { .prop { flex-wrap:wrap; } .prop .photo { width:100%; height:180px; } }
-  @media (max-width:700px) { table.hotlist, table.hotlist tbody, table.hotlist tr, table.hotlist td { display:block; } table.hotlist tr { border-top:1px solid var(--line); padding:8px 0; } table.hotlist td { border:0; padding:2px 0; text-align:left; } .nowrap { white-space:normal; } }
+  @media (max-width:700px) { table.hotlist thead { display:none; } table.hotlist, table.hotlist tbody, table.hotlist tr, table.hotlist td { display:block; } table.hotlist tr { border-top:1px solid var(--line); padding:8px 0; } table.hotlist td { border:0; padding:2px 0; text-align:left; } .nowrap { white-space:normal; } }
+  .stage { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; white-space:nowrap; background:#f0efec; color:var(--muted); }
+  .stage-in-force { background:#fbebeb; color:#9b2c2c; } .stage-expansion { background:#f9ece7; color:#a14a1a; }
+  .stage-coming { background:#f9eeda; color:#8a5a00; } .stage-proposed { background:#efedff; color:#4b3fa8; }
+  .stage-project-underway { background:#e7f1fb; color:#1b4f80; }
+  table.hotlist th { white-space:nowrap; }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>

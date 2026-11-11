@@ -21,8 +21,8 @@
 </div>
 <div class="card"><h3>🔥 Going on here</h3>
   {% if hot %}{% for e in hot %}
-    <p style="margin:0 0 4px"><a href="/hotlist#e-{{ e.id }}"><b>{{ e.title }}</b></a> <span class="tag {{ 'on' if 'Article 4' in e.category else '' }}">{{ e.category }}</span></p>
-    <p class="small" style="margin:0 0 10px">{{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}<br><span class="muted">{{ e.impact }}</span></p>
+    <p style="margin:0 0 4px"><span class="stage stage-{{ e.stage|lower|replace(' ', '-') }}">{{ e.stage or '—' }}</span> <a href="/hotlist#e-{{ e.id }}"><b>{{ e.title }}</b></a>{% if e.link %} · <a href="{{ e.link }}" target="_blank" rel="noopener">Read more ↗</a>{% endif %}</p>
+    <p class="small" style="margin:0 0 10px">{{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}{% if e.where %}<br><b>Where:</b> {{ e.where }}{% endif %}<br><span class="muted">{{ e.impact }}</span></p>
   {% endfor %}{% else %}<p class="muted">Nothing on your hot list for {{ a.name }}. <a href="/hotlist?new=1">Add something</a> (Article 4 plans, regeneration, big projects).</p>{% endif %}
 </div>
 <div class="card"><h3>Find deals in {{ a.name }}</h3>

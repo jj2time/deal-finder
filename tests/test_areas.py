@@ -171,3 +171,35 @@ def test_old_liverpool_entry_replaced_on_upgrade(tmp_path):
     assert "Liverpool: HMO Article 4 spreading across the city" not in titles
     assert "My own Leeds note" in titles
     assert sum(t.startswith("Liverpool: HMO Article 4") for t in titles) == 2
+
+
+def test_stage_where_and_link(tmp_path, monkeypatch, cfg):
+    db = DB(str(tmp_path / "x.sqlite3"))
+    hl = HotList(db)
+    by = {e["title"]: e for e in hl.all()}
+    exp = by["Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)"]
+    assert exp["stage"] == "Expansion" and "Orrell Park" in exp["where"] and exp["link"].startswith("https://")
+    assert by["Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)"]["stage"] == "In force"
+    assert by["Sizewell C nuclear power station (Suffolk)"]["stage"] == "Project underway"
+    # an entry saved before these fields existed gets them filled in
+    import json
+    old = {**exp, "id": "x1"}
+    for k in ("stage", "where", "link"):
+        old.pop(k)
+    db.conn.execute("UPDATE hotlist SET data=? WHERE id=?", (json.dumps(old), exp["id"]))
+    db.conn.commit()
+    again = next(e for e in HotList(db).all() if e["title"] == exp["title"])
+    assert again["stage"] == "Expansion" and "Old Swan" in again["where"]
+    mine = hl.save({"title": "Leeds note", "category": "Article 4 coming", "stage": "Proposed",
+                    "where": "Headingley", "link": "https://example.com/leeds"})
+    assert (mine["stage"], mine["where"], mine["link"]) == ("Proposed", "Headingley", "https://example.com/leeds")
+    assert hl.save({"title": "Bad", "link": "javascript:alert(1)"})["link"] == ""
+
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    cfg["database"] = str(tmp_path / "x.sqlite3")
+    client = TestClient(create_app(cfg))
+    page = client.get("/").text
+    for col in ("<th>Stage</th>", "<th>Where</th>", "<th>Details</th>", "Read more ↗", "stage-expansion",
+                "Orrell Park, part of Fazakerley"):
+        assert col in page, col
+    assert "Where:</b>" in client.get("/hotlist").text

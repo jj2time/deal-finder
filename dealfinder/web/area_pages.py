@@ -7,7 +7,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..areas import TYPE_LABELS, TYPES, AreaStore, explain, update_area_data
-from ..hotlist import CATEGORIES, HotList
+from ..hotlist import CATEGORIES, STAGES, HotList
 
 SORTS = {"score": "Best overall score", "yield": "Highest yield", "growth_5y": "Biggest 5-year growth",
          "growth_1y": "Biggest 1-year growth", "projected_5y": "Highest 5-year trend projection",
@@ -88,7 +88,7 @@ def register(app, templates, ctx, state, db, start_job, postcodes, scan_errors):
         editing = hotlist.get(edit) if edit else ({} if new else None)
         area_codes = {a["name"].lower(): a["code"] for a in store.all()}
         return templates.TemplateResponse(request, "hotlist.html", ctx(
-            request, entries=entries, categories=CATEGORIES, editing=editing, area_codes=area_codes))
+            request, entries=entries, categories=CATEGORIES, stages=STAGES, editing=editing, area_codes=area_codes))
 
     @app.post("/hotlist")
     async def hot_save(request: Request):
@@ -97,7 +97,8 @@ def register(app, templates, ctx, state, db, start_job, postcodes, scan_errors):
             hotlist.delete(form["delete"])
             return RedirectResponse("/hotlist", status_code=303)
         e = hotlist.save({k: form.get(k) for k in ("id", "title", "category", "councils", "postcodes", "status",
-                                                   "key_date", "summary", "impact", "sources", "checked")})
+                                                   "key_date", "summary", "impact", "sources", "checked", "stage",
+                                                   "where", "link")})
         return RedirectResponse(f"/hotlist#e-{e['id']}", status_code=303)
 
     return hot_for_council
