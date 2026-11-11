@@ -153,6 +153,14 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         return state["postcodes"].locate(s.area if s.is_full_postcode else None,
                                          None if s.is_full_postcode else s.area)
 
+    def postcodes():
+        if "postcodes" not in state:
+            from ..data.http import CachedClient
+            from ..data.postcodes import Postcodes
+            state["postcodes"] = Postcodes(CachedClient(
+                str(Path(state["cfg"]["database"]).with_name("http_cache.sqlite3"))))
+        return state["postcodes"]
+
     def current_search(request: Request) -> Search:
         qp = request.query_params
         return Search.from_params(qp.get, qp.getlist)
@@ -188,12 +196,21 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         searches = area_searches(s, hot, names) if batch_keys is None else []
         last = db.last_fetched(s.fetch_key) if s.area else None
         fetched = [(x.area, db.last_fetched(x.fetch_key)) for x in searches]
+        heads_up, seen = [], set()
+        for x in searches:
+            lookup = getattr(postcodes(), "councils", None)
+            councils = lookup(x.area if x.is_full_postcode else None,
+                              None if x.is_full_postcode else x.outcode) if lookup else []
+            for e in hot_for_council(councils):
+                if e["id"] not in seen:
+                    seen.add(e["id"])
+                    heads_up.append((x.area, councils, e))
         return TEMPLATES.TemplateResponse(request, "index.html", ctx(
             request, s=s, items=shown, total=len(items), strategies=STRATEGIES, counts=counts,
             radii=RADII_MILES, sorts={k: v[0] for k, v in SORTS.items()}, types=PROPERTY_TYPES,
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == page_query(s, names),
-            hot=hot, hot_ticked=names, searches=searches, fetched=fetched,
+            hot=hot, hot_ticked=names, searches=searches, fetched=fetched, heads_up=heads_up,
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
             recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
                      "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
@@ -337,6 +354,9 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                 scan_state["running"] = False
         threading.Thread(target=run, daemon=True).start()
         return True
+
+    from .area_pages import register as register_area_pages
+    hot_for_council = register_area_pages(app, TEMPLATES, ctx, state, db, start_job, postcodes)
 
     @app.post("/scan")
     def scan():

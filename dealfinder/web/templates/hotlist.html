@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Hot list · Deal Finder{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin:0 0 4px">🔥 Hot list</h2>
+  <p class="muted" style="margin:0">Areas with something going on: Article 4 restrictions coming in, big projects, regeneration. Kept by hand, because upcoming changes appear in council papers and news, not in any data feed. Dates change, so check the council before relying on one. Searches in these councils show a heads-up.</p>
+  <p style="margin:10px 0 0"><a class="btn" href="/hotlist?new=1#form">Add an entry</a></p>
+</div>
+{% if editing is not none %}
+<form class="card" method="post" action="/hotlist" id="form">
+  <h3>{{ 'Edit' if editing.id else 'New entry' }}</h3>
+  <input type="hidden" name="id" value="{{ editing.id or '' }}">
+  <div class="form">
+    <label class="wide">Title<input name="title" value="{{ editing.title or '' }}" required placeholder="e.g. Leeds: HMO Article 4 in Headingley"></label>
+    <label>Category<select name="category">{% for c in categories %}<option {% if c == editing.category %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></label>
+    <label>Key date<input name="key_date" value="{{ editing.key_date or '' }}" placeholder="2027-10-01 or October 2027"></label>
+    <label>Councils <span class="muted">comma-separated, as on gov.uk</span><input name="councils" value="{{ (editing.councils or [])|join(', ') }}" placeholder="Liverpool, Sefton"></label>
+    <label>Postcodes to search <span class="muted">comma-separated</span><input name="postcodes" value="{{ (editing.postcodes or [])|join(', ') }}" placeholder="L15, L9 8BX"></label>
+    <label class="wide">Status<input name="status" value="{{ editing.status or '' }}"></label>
+    <label class="wide">What's happening<textarea name="summary" rows="3">{{ editing.summary or '' }}</textarea></label>
+    <label class="wide">What it means for investors<textarea name="impact" rows="2">{{ editing.impact or '' }}</textarea></label>
+    <label class="wide">Sources <span class="muted">one per line: title | link</span><textarea name="sources" rows="3">{% for src in editing.sources or [] %}{{ src.title }} | {{ src.url }}
+{% endfor %}</textarea></label>
+    <label>Last checked<input name="checked" type="date" value="{{ editing.checked or '' }}"></label>
+  </div>
+  <div style="margin-top:12px; display:flex; gap:10px"><button>Save</button><a class="btn alt" href="/hotlist">Cancel</a></div>
+</form>
+{% endif %}
+{% for c in categories %}{% set group = entries|selectattr('category', 'equalto', c)|list %}{% if group %}
+<h3 style="margin:18px 4px 8px">{{ c }}</h3>
+{% for e in group %}
+<div class="card" id="e-{{ e.id }}">
+  <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap">
+    <div style="flex:1 1 300px"><b style="font-size:16px">{{ e.title }}</b>
+      <p class="small" style="margin:4px 0">{{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}</p></div>
+    <a class="btn alt small" href="/hotlist?edit={{ e.id }}#form">Edit</a>
+    <form method="post" action="/hotlist" style="margin:0" onsubmit="return confirm('Delete this entry?')"><input type="hidden" name="delete" value="{{ e.id }}"><button class="btn alt small">Delete</button></form>
+  </div>
+  <p style="margin:6px 0">{{ e.summary }}</p>
+  {% if e.impact %}<p style="margin:6px 0"><b>For investors:</b> {{ e.impact }}</p>{% endif %}
+  <div class="row" style="margin-top:6px">
+    {% for pc in e.postcodes %}<form method="post" action="/search" style="margin:0"><input type="hidden" name="area" value="{{ pc }}"><input type="hidden" name="radius" value="{{ '0.5' if ' ' in pc else '1' }}">{% for k in ['detached','semi-detached','terraced','flat','other'] %}<input type="hidden" name="type" value="{{ k }}">{% endfor %}<button class="btn alt small">Search {{ pc }}</button></form>{% endfor %}
+    {% for c2 in e.councils %}{% if c2|lower in area_codes %}<a class="btn alt small" href="/areas/{{ area_codes[c2|lower] }}">{{ c2 }} area report</a>{% endif %}{% endfor %}
+  </div>
+  <p class="muted small" style="margin:8px 0 0">Councils: {{ e.councils|join(', ') or '—' }} · Last checked {{ e.checked }}{% if e.sources %} · Sources: {% for src in e.sources %}<a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.title }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}</p>
+</div>
+{% endfor %}{% endif %}{% endfor %}
+{% endblock %}

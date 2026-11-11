@@ -13,6 +13,14 @@ CENTRES = {"L15": (53.3960, -2.9200), "L13": (53.4140, -2.9150), "L7": (53.4050,
 
 
 class Postcodes:
+    def councils(self, postcode=None, outcode=None):
+        oc = (outcode or postcode or "").split()[0]
+        return {"L15": ["Liverpool"], "L13": ["Liverpool"], "L9": ["Liverpool", "Sefton"],
+                "BS5": ["Bristol, City of"]}.get(oc, [])
+
+    def town_outcode(self, name):
+        return {"Liverpool": "L3"}.get(name)
+
     def locate(self, postcode=None, outcode=None):
         return CENTRES.get((outcode or postcode or "").split()[0])
 

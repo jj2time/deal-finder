@@ -84,6 +84,10 @@
 </div>
 {% endif %}
 
+{% for area, councils, e in heads_up %}
+<div class="card" style="background:#f9ece7; border-color:#efd3c6">🔥 <b>Heads-up for {{ area }}</b>{% if councils|length > 1 %} <span class="muted small">(covers {{ councils|join(', ') }})</span>{% endif %}: <a href="/hotlist#e-{{ e.id }}">{{ e.title }}</a> — {{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}
+  {% if e.impact %}<br><span class="small">{{ e.impact }}</span>{% endif %}</div>
+{% endfor %}
 {% if points %}<div class="card" id="mapcard"><div id="map"></div></div>{% endif %}
 
 {% if (searches or batch) and items %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ a.name }} · Deal Finder{% endblock %}
+{% block content %}
+{% set s = a.types[t] %}
+<div class="card">
+  <p class="muted small" style="margin:0"><a href="/areas?type={{ t }}">← Area scanner</a></p>
+  <h2 style="margin:4px 0">{{ a.name }}</h2>
+  <p class="muted" style="margin:0 0 10px">{{ a.region }} · prices to {{ meta.price_month }}, rents to {{ meta.rent_month }}</p>
+  <div class="row" style="margin-top:0">{% for k, label in types.items() %}{% if k in a.types %}<a class="tag {{ 'on' if k == t else '' }}" href="?type={{ k }}">{{ label }}</a>{% endif %}{% endfor %}</div>
+  <div class="grid" style="margin-top:12px">
+    <div class="stat"><span class="muted">Area score</span><b>{{ s.score if s.score is not none else '—' }}{% if s.score is not none %}/100{% endif %}</b></div>
+    <div class="stat"><span class="muted">Average price</span><b>{{ s.price|money }}</b><span class="muted">typical UK area {{ medians[t].price|money }}</span></div>
+    <div class="stat"><span class="muted">Average rent</span><b>{{ s.rent|money }}</b></div>
+    <div class="stat"><span class="muted">Gross yield</span><b>{% if s.yield is not none %}{{ '%.1f'|format(s.yield) }}%{% else %}—{% endif %}</b><span class="muted">typical {{ '%.1f'|format(medians[t].yield) if medians[t].yield else '—' }}%</span></div>
+    <div class="stat"><span class="muted">Growth, 1 / 5 / 10 years</span><b>{{ '%+.1f'|format(s.growth_1y) if s.growth_1y is not none else '—' }}% / {{ '%+.0f'|format(s.growth_5y) if s.growth_5y is not none else '—' }}% / {{ '%+.0f'|format(s.growth_10y) if s.growth_10y is not none else '—' }}%</b></div>
+    <div class="stat"><span class="muted">If the long-run trend continued</span><b>{{ '%+.0f'|format(s.projected_5y) if s.projected_5y is not none else '—' }}% in 5 yrs</b><span class="muted">{{ '%+.0f'|format(s.projected_10y) if s.projected_10y is not none else '—' }}% in 10 yrs · not a forecast</span></div>
+  </div>
+</div>
+<div class="card"><h3>Why {{ a.name }}{{ ' (' ~ types[t]|lower ~ ')' if t != 'all' }}</h3>
+  <ul>{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul>
+</div>
+<div class="card"><h3>🔥 Going on here</h3>
+  {% if hot %}{% for e in hot %}
+    <p style="margin:0 0 4px"><a href="/hotlist#e-{{ e.id }}"><b>{{ e.title }}</b></a> <span class="tag {{ 'on' if 'Article 4' in e.category else '' }}">{{ e.category }}</span></p>
+    <p class="small" style="margin:0 0 10px">{{ e.status }}{% if e.key_date %} · <b>{{ e.key_date }}</b>{% endif %}<br><span class="muted">{{ e.impact }}</span></p>
+  {% endfor %}{% else %}<p class="muted">Nothing on your hot list for {{ a.name }}. <a href="/hotlist?new=1">Add something</a> (Article 4 plans, regeneration, big projects).</p>{% endif %}
+</div>
+<div class="card"><h3>Find deals in {{ a.name }}</h3>
+  {% if outcode %}<form method="post" action="/search" class="row" style="margin-top:0">
+    <input type="hidden" name="area" value="{{ outcode }}"><input type="hidden" name="radius" value="3">
+    {% if t != 'all' %}<input type="hidden" name="type" value="{{ t }}">{% else %}{% for k in ['detached','semi-detached','terraced','flat','other'] %}<input type="hidden" name="type" value="{{ k }}">{% endfor %}{% endif %}
+    <button>Search within 3 miles of {{ outcode }} (town centre)</button></form>{% endif %}
+  <p class="muted small">Or type any postcode in {{ a.name }} on the <a href="/">search page</a>.</p>
+</div>
+<p class="muted small">Contains HM Land Registry data and Office for National Statistics data © Crown copyright, licensed under the Open Government Licence v3.0.</p>
+{% endblock %}

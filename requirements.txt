@@ -9,3 +9,4 @@ reportlab>=4.0
 pytest>=8.0
 respx>=0.21
 python-multipart>=0.0.9
+openpyxl>=3.1

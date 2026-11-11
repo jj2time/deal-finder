@@ -134,11 +134,26 @@ APIs, the dashboard, CSV export and the PDF. The live Land Registry, postcodes.i
 haven't been run against the real services yet — the first real scan is the test of those. The Mac app's
 launcher was tested in a simulation, not on a real Mac.
 
-## Next up (requested)
+## Area scanner
 
-- **National area scanner:** rank every postcode district in England and Wales using free government data
-  (HM Land Registry sold prices, ONS rents) by price, yield, growth and sales volume, so searches can be
-  pointed at the best areas without reading more of Rightmove.
+**Area scanner** (top menu) ranks every council area in the UK for each property type, from the official UK
+House Price Index (HM Land Registry) and ONS private rents: average price, rent, gross yield, growth over 1, 5 and
+10 years, a 5- and 10-year trend projection, sales volume, and a 0–100 score (yield 40%, 5-year growth 25%,
+1-year growth 15%, trend 10%, sales volume 10%). Press **Download area data** once (about 55 MB, under a
+minute), then **Update** monthly. Click an area for a report explaining why it does or doesn't stand out, what's
+on the hot list there, and a button to search it.
+
+The projection is each area's long-run growth (the average of its 10- and 20-year yearly growth) carried
+forward. It shows what happens if the long-run trend continues; it is not a forecast. Scotland and Northern
+Ireland have no council-level rents in the ONS data, so they show no yield or score.
+
+## Hot list
+
+**🔥 Hot list** (top menu) tracks areas with something going on: Article 4 directions coming in, big projects
+like Sizewell C, regeneration. It starts with entries researched on 11 November 2026, each with sources and a
+"last checked" date; add, edit or delete entries yourself. Searches in a council on the hot list show a heads-up,
+and the area scanner flags them. Upcoming changes come from council papers and news, so the list is kept by
+hand; always check with the council before relying on a date.
 
 ## Not built yet
 

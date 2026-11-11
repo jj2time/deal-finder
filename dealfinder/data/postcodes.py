@@ -86,3 +86,30 @@ class Postcodes:
             for p in r.get("result") or []:
                 out[p["postcode"]] = haversine_m(lat, lon, p["latitude"], p["longitude"])
         return list(out.items())
+
+    def councils(self, postcode: str | None = None, outcode: str | None = None) -> list[str]:
+        """Council(s) a postcode or district falls in (a district can span several)."""
+        try:
+            if postcode:
+                r = self.http.request_json("GET", f"{BASE}/postcodes/{postcode.replace(' ', '')}")
+                d = (r.get("result") or {}).get("admin_district")
+                return [d] if d else []
+            if outcode:
+                r = self.http.request_json("GET", f"{BASE}/outcodes/{outcode}")
+                return list((r.get("result") or {}).get("admin_district") or [])
+        except Exception:
+            return []
+        return []
+
+    def town_outcode(self, name: str) -> str | None:
+        """Postcode district at a town's centre, e.g. 'Liverpool' -> 'L3'."""
+        try:
+            r = self.http.request_json("GET", f"{BASE}/places", params={"q": name, "limit": 10})
+        except Exception:
+            return None
+        results = r.get("result") or []
+        exact = [p for p in results if (p.get("name_1") or "").lower() == name.lower() and p.get("outcode")]
+        for p in exact or results:
+            if p.get("outcode"):
+                return p["outcode"]
+        return None

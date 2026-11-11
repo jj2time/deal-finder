@@ -61,12 +61,16 @@
   .hotareas { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin-top:12px; padding:8px 10px; background:#f9ece7; border-radius:8px; }
   .hotlabel { font-weight:700; } .hot { display:inline-flex; align-items:center; gap:4px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:3px 4px 3px 8px; }
   .hot label.check { margin-right:2px; }
+  .mainnav { display:flex; gap:4px; flex-wrap:wrap; } .mainnav a { color:var(--ink); text-decoration:none; padding:6px 10px; border-radius:6px; } .mainnav a:hover { background:var(--bg); }
+  @media (max-width:700px) { header { flex-wrap:wrap; } }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>
 </head>
 <body>
-<header><h1><a href="/">Deal Finder</a></h1>{% block header %}{% endblock %}
+<header><h1><a href="/">Deal Finder</a></h1>
+<nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a><a href="/hotlist">🔥 Hot list</a></nav>
+{% block header %}{% endblock %}
 <form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? Daily scans pause until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
 <main>{% block content %}{% endblock %}</main>
 <footer>Estimates only, not financial advice. Contains HM Land Registry data © Crown copyright and database right {{ year }}. This data is licensed under the Open Government Licence v3.0.</footer>

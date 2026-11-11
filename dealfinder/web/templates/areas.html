@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Area scanner · Deal Finder{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin:0 0 4px">Area scanner</h2>
+  <p class="muted" style="margin:0 0 10px">Every council area in the UK ranked by yield and growth, from the official UK House Price Index (HM Land Registry) and ONS private rents.
+  {% if meta %}Prices to {{ meta.price_month }}, rents to {{ meta.rent_month }}; {{ meta.areas }} areas.{% endif %}</p>
+  {% if scan.running and scan.query == 'areas' %}
+    <div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
+    <script>setInterval(async()=>{const st=await (await fetch('/scan/status')).json(); if(!st.running) location.reload(); else document.getElementById('progress').textContent=st.progress||'';},2500);</script>
+  {% else %}
+    {% if scan.error and scan.query == 'areas' %}<div class="card warn"><b>The update didn't finish:</b> {{ scan.error }}</div>{% endif %}
+    <form method="post" action="/areas/update" style="margin:0"><button class="{{ 'btn alt' if meta else '' }}">{{ 'Update area data' if meta else 'Download area data (about 55 MB, takes a minute)' }}</button>
+      <span class="muted small">{{ 'New figures come out monthly.' if meta else 'Needed once; then update monthly.' }}</span></form>
+  {% endif %}
+</div>
+{% if meta %}
+<form class="card row" method="get" action="/areas" style="margin-top:0">
+  <label>Property type<select name="type">{% for k, label in types.items() %}<option value="{{ k }}" {% if k == t %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <label>Region<select name="region"><option value="">All of the UK</option>{% for r in regions %}<option {% if r == region %}selected{% endif %}>{{ r }}</option>{% endfor %}</select></label>
+  <label>Max average price £<input name="max_price" value="{{ max_price }}" size="8"></label>
+  <label>Min yield %<input name="min_yield" value="{{ min_yield }}" size="4"></label>
+  <label>Find<input name="q" value="{{ q }}" placeholder="town or city" size="12"></label>
+  <label>Sort by<select name="sort">{% for k, label in sorts.items() %}<option value="{{ k }}" {% if k == sort %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button>Show</button>
+</form>
+<div class="card scroll">
+  <p class="muted small" style="margin-top:0">{{ rows|length }} areas · {{ types[t] }}. Score: yield 40%, 5-year growth 25%, 1-year growth 15%, 10-year trend 10%, sales volume 10%, each compared with every other area (100 = best). *Next 5 yrs = the long-run trend (average of 10- and 20-year growth) carried forward. It's not a forecast.</p>
+  <table>
+    <thead><tr><th>#</th><th>Score</th><th>Area</th><th class="num">Avg price</th><th class="num">Rent pcm</th><th class="num">Yield</th><th class="num">1 yr</th><th class="num">5 yr</th><th class="num">10 yr</th><th class="num" title="If the long-run trend (average of 10- and 20-year growth) continued">Next 5 yrs*</th><th class="num">Sales/yr</th><th></th></tr></thead>
+    <tbody>
+    {% for a, s, hot in rows %}
+    <tr>
+      <td class="muted">{{ loop.index }}</td>
+      <td>{% if s.score is not none %}<span class="score {% if s.score < 40 %}low{% elif s.score < 65 %}mid{% endif %}">{{ s.score }}</span>{% else %}<span class="muted small" title="No ONS rent figures for this area">—</span>{% endif %}</td>
+      <td><a href="/areas/{{ a.code }}?type={{ t }}">{{ a.name }}</a><br><span class="muted small">{{ a.region }}</span></td>
+      <td class="num">{{ s.price|money }}</td>
+      <td class="num">{{ s.rent|money }}</td>
+      <td class="num">{% if s.yield is not none %}{{ '%.1f'|format(s.yield) }}%{% else %}—{% endif %}</td>
+      <td class="num">{% if s.growth_1y is not none %}{{ '%+.1f'|format(s.growth_1y) }}%{% endif %}</td>
+      <td class="num">{% if s.growth_5y is not none %}{{ '%+.0f'|format(s.growth_5y) }}%{% endif %}</td>
+      <td class="num">{% if s.growth_10y is not none %}{{ '%+.0f'|format(s.growth_10y) }}%{% endif %}</td>
+      <td class="num">{% if s.projected_5y is not none %}{{ '%+.0f'|format(s.projected_5y) }}%{% endif %}</td>
+      <td class="num">{{ '{:,}'.format(a.sales_12m) if a.sales_12m else '—' }}</td>
+      <td>{% for e in hot %}<a class="tag {{ 'on' if 'Article 4' in e.category else '' }}" href="/hotlist#e-{{ e.id }}" title="{{ e.title }}">{{ '🔥 ' ~ e.category }}</a>{% endfor %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+<p class="muted small">Contains HM Land Registry data and Office for National Statistics data © Crown copyright, licensed under the Open Government Licence v3.0.</p>
+{% endblock %}

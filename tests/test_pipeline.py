@@ -22,6 +22,14 @@ class FakeSource:
 
 
 class FakePostcodes:
+    def councils(self, postcode=None, outcode=None):
+        oc = (outcode or postcode or "").split()[0]
+        return {"L15": ["Liverpool"], "L13": ["Liverpool"], "L9": ["Liverpool", "Sefton"],
+                "BS5": ["Bristol, City of"]}.get(oc, [])
+
+    def town_outcode(self, name):
+        return {"Liverpool": "L3"}.get(name)
+
     def locate(self, postcode=None, outcode=None):
         return (51.46, -2.56)
 
