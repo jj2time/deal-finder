@@ -73,13 +73,13 @@ def test_daily_scan_runs_once_at_the_set_time(cfg, monkeypatch):
 
     class FakeApp:
         class state:
-            settings = {"cfg": {**cfg, "schedule": {"daily_at": "07:30"}}}
+            settings = {"cfg": {**cfg, "schedule": {"enabled": True, "daily_at": "07:30"}}}
 
     class FakeScanner:
         def __init__(self, cfg):
             pass
 
-        def run(self):
+        def daily_check(self):
             runs.append(1)
 
     import apscheduler.schedulers.background as bg

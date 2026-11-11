@@ -23,15 +23,22 @@ def start_daily_scans(app) -> None:
 
     def tick():
         cfg = app.state.settings["cfg"]
-        target = str((cfg.get("schedule") or {}).get("daily_at", "07:30")).zfill(5)
+        sched = cfg.get("schedule") or {}
+        if not sched.get("enabled"):          # the daily check is off unless switched on in Settings
+            return
+        target = str(sched.get("daily_at", "07:30")).zfill(5)
         now = datetime.now()
         if now.strftime("%H:%M") == target and last_run["date"] != now.date():
             last_run["date"] = now.date()
-            logging.info("Daily scan starting")
-            try:
-                Scanner(cfg).run()
-            except Exception:
-                logging.exception("Daily scan failed")
+            logging.info("Daily check starting")
+            start = getattr(app.state, "start_job", None)
+            if start:                        # waits its turn behind anything already running
+                start(lambda sc: sc.daily_check(), "daily", "Daily check of your saved searches")
+            else:
+                try:
+                    Scanner(cfg).daily_check()
+                except Exception:
+                    logging.exception("Daily check failed")
 
     sched = BackgroundScheduler()
     sched.add_job(tick, "interval", minutes=1, max_instances=1)

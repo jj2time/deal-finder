@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS price_history (key TEXT, price INTEGER, seen_at TEXT)
 CREATE TABLE IF NOT EXISTS analyses (key TEXT PRIMARY KEY, score INTEGER, data TEXT, updated_at TEXT);
 CREATE TABLE IF NOT EXISTS alerts_sent (key TEXT PRIMARY KEY, sent_at TEXT);
 CREATE INDEX IF NOT EXISTS idx_ph_key ON price_history(key);
+CREATE TABLE IF NOT EXISTS digest (key TEXT PRIMARY KEY, label TEXT, found_at TEXT);
 CREATE TABLE IF NOT EXISTS searches (
   fetch_key TEXT PRIMARY KEY, search TEXT, last_fetched TEXT, last_count INTEGER, saved INTEGER DEFAULT 0
 );
@@ -136,3 +137,23 @@ class DB:
     def is_saved(self, fetch_key: str) -> bool:
         row = self.conn.execute("SELECT saved FROM searches WHERE fetch_key=?", (fetch_key,)).fetchone()
         return bool(row and row["saved"])
+
+    # ---- daily check results ----
+    def add_digest(self, key: str, label: str) -> None:
+        self.conn.execute("INSERT OR IGNORE INTO digest VALUES (?,?,?)", (key, label, now()))
+        self.conn.commit()
+
+    def digest(self, days: int = 7) -> list[dict]:
+        from datetime import datetime, timedelta, timezone
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat(timespec="seconds")
+        out = []
+        for r in self.conn.execute("SELECT key, label, found_at FROM digest WHERE found_at >= ? "
+                                   "ORDER BY found_at DESC", (since,)):
+            item = self.result(r["key"])
+            if item:
+                out.append({**item, "label": r["label"], "found_at": r["found_at"]})
+        return out
+
+    def clear_digest(self) -> None:
+        self.conn.execute("DELETE FROM digest")
+        self.conn.commit()

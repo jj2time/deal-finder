@@ -19,7 +19,10 @@ price, bedroom and deal-type filters. Edit the list in Settings → Hot areas (o
 
 **Send to Deal Finder button.** Drag the button on the search page to your bookmarks bar. While you browse
 Rightmove yourself, click it on any results page and every listing on that page is analysed in Deal Finder.
-**Save search** re-runs it every day and emails you new high-scoring deals.
+**Save search** keeps it at the top of Your searches. Optionally, Settings → **Daily check** re-checks your
+★ saved searches once a day as gently as possible (one Rightmove results page each, no property pages) and lists
+only new deals that match your ticks and score high enough under **🆕 New** on the search page, with a Mac
+notification. It's off unless you switch it on.
 
 **What it does on every search or scan**
 

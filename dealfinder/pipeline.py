@@ -127,7 +127,7 @@ class Scanner:
 
     # ---- processing ----
     def process(self, listings: Iterable[Listing], keep: Callable[[Listing], bool]) -> dict:
-        stats = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0}
+        stats = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0, "new_keys": []}
         listings = list(listings)
         stats["fetched"] = len(listings)
         wanted = [l for l in listings if keep(l)]
@@ -136,6 +136,8 @@ class Scanner:
             stats["kept"] += 1
             info = self.db.upsert_listing(l)
             stats["new"] += info["new"]
+            if info["new"]:
+                stats["new_keys"].append(l.key)
             l.raw["_price_reductions"] = info["reductions"]
             a = self.analyse_listing(l)
             self.db.upsert_listing(l)  # store lat/lon found during valuation
@@ -263,6 +265,37 @@ class Scanner:
                 log.error("Saved search %s failed: %s", saved.get("area"), e)
         log.info("Scan done: %s", total)
         return total
+
+    def daily_check(self) -> dict:
+        """The gentle daily check: each ★ saved search, 1 Rightmove results page, no property pages.
+        Keeps only listings that are new, match the search's ticked deal types and score high enough."""
+        from .search import matches
+        sched = self.cfg.get("schedule") or {}
+        min_score = int(sched.get("min_score", 50) or 0)
+        self._rightmove_reader = RightmoveReader(max_pages=1, details="none")
+        found, errors = [], []
+        saved = self.db.saved_searches()
+        for i, d in enumerate(saved, 1):
+            s = Search.from_dict(d)
+            self.progress(f"Daily check {i} of {len(saved)}: {s.describe()}")
+            try:
+                stats = self.run_search(s)
+            except SearchError as e:
+                errors.append(f"{s.area}: {e}")
+                continue
+            centre = self.pc.locate(s.area if s.is_full_postcode else None, None if s.is_full_postcode else s.area)
+            for key in stats.get("new_keys", []):
+                item = self.db.result(key)
+                if item and item["analysis"]["score"] >= min_score and matches(item, s, centre):
+                    found.append((key, s.describe() + (f" · {', '.join(s.deals)}" if s.deals else "")))
+        for key, label in found:
+            self.db.add_digest(key, label)
+        log.info("Daily check: %d searches, %d new matches, errors: %s", len(saved), len(found), errors)
+        if found:
+            from .notify import mac_notification
+            mac_notification("Deal Finder", f"{len(found)} new deal{'s' if len(found) != 1 else ''} "
+                                            "match your saved searches")
+        return {"searches": len(saved), "new_matches": len(found), "errors": errors}
 
     def _maybe_alert(self, l: Listing, a) -> bool:
         acfg = self.cfg.get("alerts") or {}

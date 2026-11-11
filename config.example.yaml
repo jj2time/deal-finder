@@ -86,4 +86,6 @@ alerts:
   min_score: 70
 
 schedule:
-  daily_at: "07:30"            # local time the saved searches re-run when using `run`
+  enabled: false               # the gentle daily check of ★ saved searches (Settings → Daily check)
+  daily_at: "07:30"
+  min_score: 50                # only report new deals scoring at least this

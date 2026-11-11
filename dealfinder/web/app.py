@@ -111,6 +111,9 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
     al["enabled"] = bool(form.get("alerts_enabled"))
     al["to"] = form.get("alerts_to", "").strip()
     al["min_score"] = _num(form.get("alerts_min_score"), int) or 70
+    sch = cfg.setdefault("schedule", {})
+    sch["enabled"] = bool(form.get("daily_enabled"))
+    sch["min_score"] = _num(form.get("daily_min_score"), int) if form.get("daily_min_score") not in (None, "") else 50
     t = form.get("daily_at", "07:30").strip()
     if re.fullmatch(r"\d{1,2}:\d{2}", t):
         cfg.setdefault("schedule", {})["daily_at"] = t
@@ -258,7 +261,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == page_query(s, names),
             hot=hot, hot_ticked=names, searches=searches, fetched=fetched, heads_up=heads_up,
-            hotlist_entries=app.state.hotlist.all(),
+            hotlist_entries=app.state.hotlist.all(), digest=db.digest() if not s.area and batch_keys is None else [],
+            daily_on=bool((state["cfg"].get("schedule") or {}).get("enabled")),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
             recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
                      "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
@@ -415,6 +419,13 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                     scan_state["errors"].pop(query, None)
         threading.Thread(target=run, args=(work, query), daemon=True).start()
         return True
+
+    app.state.start_job = start_job
+
+    @app.post("/digest/clear")
+    def digest_clear():
+        db.clear_digest()
+        return RedirectResponse("/", status_code=303)
 
     from .area_pages import register as register_area_pages
     hot_for_council = register_area_pages(app, TEMPLATES, ctx, state, db, start_job, postcodes,

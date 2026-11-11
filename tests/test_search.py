@@ -195,7 +195,7 @@ def test_search_page_flow(tmp_path, monkeypatch, cfg, token):
     assert client.get("/scan/status").json()["running"] is False
     # save it
     client.post("/search/save", data={"area": "BS5 6AA", "radius": "1", "saved": "1"})
-    assert "Saved — scans daily" in client.get("/", params={"area": "BS5 6AA", "radius": 1}).text
+    assert "★ Saved" in client.get("/", params={"area": "BS5 6AA", "radius": 1}).text
 
 
 def test_friendly_apify_errors():
@@ -258,7 +258,7 @@ def test_searches_are_remembered_and_can_be_saved(tmp_path, monkeypatch, cfg, to
         time.sleep(0.1)
     home = client.get("/").text
     assert "within 1 mile of BS5 6AA, up to £150,000" in home and "3 found" in home   # remembered automatically
-    assert "Save (scan daily)" in home and "★" not in home.split("Your searches")[1]
+    assert "☆ Save" in home and "★" not in home.split("Your searches")[1]
     # Save it from the list; we come back to the same page
     r = client.post("/search/save", data={"area": "BS5 6AA", "radius": "1", "max_price": "150000",
                                           "deal": "BMV", "saved": "1", "back": "/"}, follow_redirects=False)

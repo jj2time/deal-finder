@@ -9,6 +9,24 @@
 {% if batch %}<div class="card ok"><b>{{ batch_count }} listings from your browser.</b> Tick deal types below and press Search to filter them, or <a href="/">start a new search</a>.</div>{% endif %}
 {% set err = scan.errors.get(query) or scan.errors.get('batch=' ~ batch) %}{% if err and not (scan.running and scan.query == query) %}<div class="card warn"><b>The search didn't finish:</b> {{ err }}</div>{% endif %}
 
+{% if digest %}
+<div class="card" style="border-color:#bfe0bd">
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap"><h3 style="margin:0">🆕 New from your daily check</h3>
+    <span class="muted small">{{ digest|length }} in the last 7 days</span><span style="flex:1"></span>
+    <form method="post" action="/digest/clear" style="margin:0"><button class="btn alt small">Clear</button></form></div>
+  <table style="margin-top:8px">
+  {% for it in digest %}{% set l = it.listing %}{% set a = it.analysis %}
+    <tr><td><span class="score {% if a.score < 40 %}low{% elif a.score < 65 %}mid{% endif %}">{{ a.score }}</span></td>
+      <td><a href="/deal/{{ l.key }}"><b>{{ l.address or 'Unknown address' }}</b></a><br><span class="muted small">{{ l.bedrooms or '?' }} bed {{ l.property_type }} · {{ it.label }}</span></td>
+      <td class="num">{{ l.price|money }}<br><span class="muted small">value {{ a.market_value|money }}</span></td>
+      <td class="num">{% if a.bmv_pct is not none %}{{ a.bmv_pct }}% BMV{% endif %}</td>
+      <td>{% for m in a.strategies[:4] %}<span class="tag">{{ m.name }}</span>{% endfor %}</td>
+      <td class="muted small nowrap">{{ it.found_at[:10] }}</td></tr>
+  {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 <form class="card" method="{{ 'get' if batch else 'post' }}" action="{{ '/' if batch else '/search' }}" id="search">
   {% if batch %}<input type="hidden" name="batch" value="{{ batch }}">{% endif %}
   <div class="searchbar">
@@ -78,8 +96,8 @@
   {% if searches|length == 1 %}
   <form method="post" action="/search/save" style="margin:0">
     {% for k, v in request.query_params.multi_items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
-    {% if saved %}<input type="hidden" name="saved" value="0"><button class="btn alt" title="Stop scanning this search every day">★ Saved — scans daily</button>
-    {% else %}<input type="hidden" name="saved" value="1"><button class="btn alt" title="Re-run this search every day and email me new deals">☆ Save search (scan daily)</button>{% endif %}
+    {% if saved %}<input type="hidden" name="saved" value="0"><button class="btn alt" title="Unsave this search">★ Saved</button>
+    {% else %}<input type="hidden" name="saved" value="1"><button class="btn alt" title="Keep this search at the top; included in the daily check if it's on">☆ Save search</button>{% endif %}
   </form>
   {% endif %}
   <a class="btn alt" href="/export.csv?{{ query }}">Export CSV</a>
@@ -159,22 +177,22 @@
   <table class="searches">
     {% for r in recent %}
     <tr>
-      <td>{% if r.saved %}<span title="Re-checked every day">★</span>{% endif %}</td>
+      <td>{% if r.saved %}<span title="Saved">★</span>{% endif %}</td>
       <td><a href="/?{{ r.q }}">{{ r.label }}</a>{% if r.deals %}<br><span class="muted small">{{ r.deals|join(', ') }}</span>{% endif %}</td>
       <td class="muted small">{% if r.when %}{{ r.when[:16]|replace('T',' ') }}{% if r.count is not none %} · {{ r.count }} found{% endif %}{% else %}not run yet{% endif %}</td>
       <td class="num"><form method="post" action="/search/save" style="margin:0">
         {% for k, v in r.form|parse_qs %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
         <input type="hidden" name="back" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
         <input type="hidden" name="saved" value="{{ '0' if r.saved else '1' }}">
-        <button class="btn alt small">{{ 'Unsave' if r.saved else 'Save (scan daily)' }}</button></form></td>
+        <button class="btn alt small">{{ 'Unsave' if r.saved else '☆ Save' }}</button></form></td>
     </tr>
     {% endfor %}
   </table>
   {% if saved_searches %}
   <form method="post" action="/scan" style="margin:10px 0 0"><button class="btn alt" {% if scan.running %}disabled{% endif %}>Run all ★ saved searches now</button>
-    <span class="muted small">★ searches also run automatically every day while Deal Finder is open.</span></form>
+    <span class="muted small">{% if daily_on %}★ searches are also checked gently once a day (<a href="/settings#daily">daily check</a> is on).{% else %}The <a href="/settings#daily">daily check</a> is off, so nothing runs unless you ask.{% endif %}</span></form>
   {% endif %}
-  {% else %}<p class="muted">Your searches will appear here automatically. Press <b>Save</b> on one to have it re-checked every day.</p>{% endif %}
+  {% else %}<p class="muted">Your searches will appear here automatically. Press <b>Save</b> to keep one at the top and include it in the optional <a href="/settings#daily">daily check</a>.</p>{% endif %}
   <form method="post" action="/upload" enctype="multipart/form-data" class="row" style="margin-top:14px">
     <label>Import an auction catalogue or any list (CSV)<input type="file" name="file" accept=".csv" required></label>
     <button class="btn alt">Import</button>

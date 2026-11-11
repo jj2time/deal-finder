@@ -159,3 +159,83 @@ def test_new_default_areas_added_once_to_a_saved_list(cfg):
     assert cfg["hot_areas"][0]["radius"] == 3                     # their own settings untouched
     cfg["hot_areas"] = cfg["hot_areas"][:2]                       # they delete the new ones later…
     assert not upgrade_hot_areas(cfg) and len(cfg["hot_areas"]) == 2   # …and they stay deleted
+
+
+def test_gentle_daily_check(tmp_path, monkeypatch, cfg):
+    """Off by default; when on: 1 results page, no property pages, only new matching deals, notification."""
+    import dealfinder.notify as notify
+    from dealfinder.sources.rightmove import RightmoveReader
+    sc = Scanner(cfg, http=HTTP(), land_registry=FakeLR(), postcodes=Postcodes(), propertydata=FakePD(),
+                 sources=[], rightmove_reader=Reader())
+    readers = []
+    real_search = Reader.search
+
+    def spy(self, url, progress=lambda m: None):
+        return real_search(self, url, progress)
+    import dealfinder.pipeline as pipeline
+
+    class SpyReader(Reader):
+        def __init__(self, max_pages, details):
+            super().__init__()
+            readers.append((max_pages, details))
+    monkeypatch.setattr(pipeline, "RightmoveReader", SpyReader)
+    sent = []
+    monkeypatch.setattr(notify, "mac_notification", lambda t, m: sent.append(m) or True)
+    s1 = Search(area="L15", radius_miles=1)
+    s2 = Search(area="L13", radius_miles=1, deals=["Nonexistent deal type"])
+    for s in (s1, s2):
+        sc.db.set_saved(s.fetch_key, s.to_dict(), True)
+    cfg["schedule"] = {"enabled": True, "daily_at": "07:30", "min_score": 0}
+    out = sc.daily_check()
+    assert readers == [(1, "none")]                                  # gentlest settings
+    assert out["searches"] == 2 and out["new_matches"] == 2           # L15's 2 new; L13 filtered by its ticks
+    assert [d["label"].split(" ·")[0] for d in sc.db.digest()] == ["within 1 mile of L15"] * 2
+    assert sent == ["2 new deals match your saved searches"]
+    # second day: nothing new, no notification
+    sc._rightmove_reader = None
+    out = sc.daily_check()
+    assert out["new_matches"] == 0 and len(sent) == 1
+    cfg["schedule"]["min_score"] = 101
+    sc.db.clear_digest()
+    assert sc.db.digest() == []
+
+
+def test_daily_check_off_by_default_and_settings(tmp_path, monkeypatch, cfg):
+    import dealfinder.__main__ as main_mod
+    from datetime import datetime
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    cfg.pop("schedule", None)
+    app = create_app(cfg)
+    client = TestClient(app)
+    started = []
+    app.state.start_job = lambda work, q, label: started.append(q)
+    jobs = []
+
+    class Sched:
+        def add_job(self, fn, *a, **k):
+            jobs.append(fn)
+
+        def start(self):
+            pass
+    import apscheduler.schedulers.background as bg
+    monkeypatch.setattr(bg, "BackgroundScheduler", Sched)
+
+    class FakeDT(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 12, 7, 30)
+    monkeypatch.setattr(main_mod, "datetime", FakeDT)
+    main_mod.start_daily_scans(app)
+    jobs[0]()
+    assert started == []                                                # off by default
+    s = Search(area="L15", radius_miles=1)
+    from dealfinder.db import DB
+    DB(cfg["database"]).set_saved(s.fetch_key, s.to_dict(), True)
+    assert "daily check</a> is off" in client.get("/").text
+    client.post("/settings", data={"daily_enabled": "on", "daily_at": "07:30", "daily_min_score": "60"})
+    assert app.state.settings["cfg"]["schedule"] == {**app.state.settings["cfg"]["schedule"], "enabled": True,
+                                                     "min_score": 60}
+    app.state.start_job = lambda work, q, label: started.append(q)
+    jobs[0]()
+    assert started == ["daily"]
+    assert "daily check</a> is on" in client.get("/").text
