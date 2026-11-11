@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Condition report · Deal Finder{% endblock %}
+{% block content %}
+{% set l = item.listing if item else None %}
+<div class="card">
+  <p class="muted small" style="margin:0"><a href="/photos">← Photo check</a></p>
+  <h2 style="margin:4px 0">📷 {{ l.address if l else 'Condition report' }}</h2>
+  <p class="muted" style="margin:0 0 10px">From Claude, based on the listing photos only — not a survey. Saved {{ rep.saved_at[:16]|replace('T',' ') }} UTC.</p>
+  {% if rep.refurb_low and rep.refurb_high %}<p style="font-size:17px"><b>Refurb estimate: £{{ "{:,}".format(rep.refurb_low) }}–£{{ "{:,}".format(rep.refurb_high) }}</b></p>{% endif %}
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
+    {% if l %}<a class="btn" href="/deal/{{ l.key }}">Property details</a>
+      {% if rep.refurb_low and rep.refurb_high %}<a class="btn alt" href="/deal/{{ l.key }}/post?refurb={{ ((rep.refurb_low + rep.refurb_high) / 2)|round|int }}">Use in deal post</a>{% endif %}{% endif %}
+    {% if rm_url %}<a class="btn alt" href="{{ rm_url }}" target="_blank" rel="noopener">View on Rightmove</a>
+      <button class="btn alt" onclick="analysePhotos('{{ rm_url }}')">📷 Analyse again</button>{% endif %}
+  </div>
+  {% if not l %}<p class="muted small">This property isn't in your Deal Finder searches yet, so there are no sold-price figures for it. Search its postcode to add them.</p>{% endif %}
+  <div class="report">{{ rep.report }}</div>
+</div>
+{% endblock %}

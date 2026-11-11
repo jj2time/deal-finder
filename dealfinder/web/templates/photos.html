@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Photo check · Deal Finder{% endblock %}
+{% block content %}
+<div class="card">
+  <h2 style="margin:0 0 4px">📷 Photo check</h2>
+  <p class="muted" style="margin:0 0 12px">Claude looks at a listing's photos and floorplan and writes a condition report with a refurb estimate — using your own Claude plan, no extra cost.</p>
+  {% if not claude.connected %}
+    <div class="card warn" style="margin:0 0 12px">One-time setup needed: install the free <a href="https://claude.ai/download" target="_blank" rel="noopener">Claude Desktop app</a>, then <a href="/settings#claude">connect it in Settings</a> and quit and reopen Claude Desktop (Cmd+Q).</div>
+  {% endif %}
+  <form onsubmit="analysePhotos(document.getElementById('rmlink').value); return false;" class="searchbar">
+    <label class="grow">Rightmove property link<input id="rmlink" placeholder="https://www.rightmove.co.uk/properties/…" autofocus></label>
+    <button class="big">📷 Analyse photos</button>
+  </form>
+  <ol class="small muted" style="margin:12px 0 0">
+    <li>Press <b>Analyse photos</b> (here, or on any property in your search results).</li>
+    <li>Claude Desktop opens — press <b>Cmd+V</b> then <b>Enter</b>. (The first time, allow Deal Finder's tools: choose <b>Always allow</b>.)</li>
+    <li>The report appears below by itself when Claude has finished (about a minute).</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h3>Reports</h3>
+  {% if reports %}
+  <table>
+    <thead><tr><th>Property</th><th class="num">Asking</th><th class="num">Refurb estimate</th><th>When</th><th></th></tr></thead>
+    <tbody>
+    {% for r in reports %}
+      <tr><td><a href="/report/{{ r.key }}"><b>{{ r.title }}</b></a></td>
+        <td class="num">{{ r.price|money }}</td>
+        <td class="num">{% if r.refurb_low and r.refurb_high %}£{{ "{:,}".format(r.refurb_low) }}–£{{ "{:,}".format(r.refurb_high) }}{% else %}—{% endif %}</td>
+        <td class="muted small">{{ r.saved_at[:16]|replace('T',' ') }}</td>
+        <td><a class="btn alt small" href="/report/{{ r.key }}">Open</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No reports yet. Paste a Rightmove link above and press Analyse photos.</p>{% endif %}
+</div>
+<script>
+  // Reload when a new report arrives, so it shows up without refreshing.
+  const startCount = {{ reports|length }};
+  setInterval(async () => { try { const s = await (await fetch('/photos/status', {cache: 'no-store'})).json(); if (s.count !== startCount) location.reload(); } catch (e) {} }, 5000);
+</script>
+{% endblock %}

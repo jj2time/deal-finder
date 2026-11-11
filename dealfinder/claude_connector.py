@@ -217,8 +217,8 @@ def build_server():
     def save_condition_report(property: str, report: str, refurb_low: int | None = None,
                               refurb_high: int | None = None) -> str:
         key = save_report(property, report, refurb_low, refurb_high)
-        return (f"Saved to Deal Finder ({key}). Open the property there to see it"
-                + (f"; refurb estimate £{refurb_low:,}–£{refurb_high:,}." if refurb_low and refurb_high else "."))
+        return (f"Saved to Deal Finder. It's on the Photo check tab: http://127.0.0.1:8765/report/{key}"
+                + (f" (refurb estimate £{refurb_low:,}–£{refurb_high:,})." if refurb_low and refurb_high else "."))
 
     @server.prompt(title="Analyse property photos",
                    description="Look at a listing's photos and report on its condition and likely refurb cost.")
@@ -299,3 +299,36 @@ def claude_desktop_status(home_dir: "Path | None" = None) -> dict:
     except (OSError, ValueError):
         connected = False
     return {"installed": cfg.parent.exists(), "connected": connected}
+
+
+def list_reports(db: DB) -> list[dict]:
+    _ensure_reports_table(db)
+    out = []
+    for r in db.conn.execute("SELECT r.*, l.address, l.price, l.url FROM condition_reports r "
+                             "LEFT JOIN listings l ON l.key = r.key ORDER BY r.saved_at DESC"):
+        d = dict(r)
+        first = (d.get("report") or "").strip().splitlines()
+        d["title"] = d.get("address") or next((ln.strip("# *") for ln in first if ln.strip()), d["key"])
+        out.append(d)
+    return out
+
+
+def report_keys(db: DB) -> set[str]:
+    _ensure_reports_table(db)
+    return {r[0] for r in db.conn.execute("SELECT key FROM condition_reports")}
+
+
+def prompt_for(url: str) -> str:
+    return f"Analyse the photos of {url}"
+
+
+def open_claude_desktop() -> bool:
+    """Brings Claude Desktop to the front on a Mac. False anywhere else."""
+    import subprocess
+    import sys
+    if sys.platform != "darwin":
+        return False
+    try:
+        return subprocess.run(["open", "-a", "Claude"], timeout=15, capture_output=True).returncode == 0
+    except Exception:
+        return False

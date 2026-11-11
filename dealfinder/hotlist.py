@@ -70,151 +70,562 @@ def default_stage(category: str) -> str:
     return {"Article 4 in force": "In force", "Article 4 coming": "Coming",
             "Major project": "Project underway"}.get(category, "")
 
-SEED_VERSION = 2
+SEED_VERSION = 3
 # Seed entries replaced in later versions (removed only if the person never edited them).
-REPLACED_SEEDS = {2: ["Liverpool: HMO Article 4 spreading across the city"]}
+REPLACED_SEEDS = {2: ["Liverpool: HMO Article 4 spreading across the city"],
+                  3: ["Liverpool: HMO Article 4 spreading across the city", "Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)", "Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)", "Preston: HMO Article 4", "Hertsmere (Potters Bar): HMO Article 4", "North Tyneside: HMO Article 4 in eight wards", "Burnley: HMO Article 4 extending to six more wards", "Bury: borough-wide HMO Article 4", "Sizewell C nuclear power station (Suffolk)"]}
+# Researched 11-12 Nov 2026: upcoming HMO Article 4 directions (2027-2028) and major projects.
 SEED: list[dict[str, Any]] = [
-    {
-        "title": "Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)",
-        "category": "Article 4 in force",
-        "councils": ["Liverpool"],
-        "postcodes": ["L15", "L7", "L8", "L6"],
-        "status": "In force since 17 June 2021",
-        "key_date": "2021-06-17",
-        "summary": ("Turning a family home into a small HMO (3+ unrelated people) needs planning permission in 11 of "
-                    "Liverpool's former wards: Anfield, Central, Greenbank, Kensington and Fairfield, Picton, Princes "
-                    "Park, Riverside, Tuebrook and Stoneycroft, Wavertree, and parts of Church and Kirkdale. An earlier "
-                    "2018 direction covered the Dales area of Greenbank. Ward boundaries changed in 2023, so check the "
-                    "council's map for a specific street."),
-        "impact": ("New HMO conversions in these areas need planning permission. HMOs lawfully in use before "
-                   "17 June 2021 aren't affected, which makes existing licensed HMOs here scarcer and more valuable."),
-        "sources": [
-            {"title": "Liverpool City Council: planning permission for HMOs",
-             "url": "https://liverpool.gov.uk/planning-and-building-control/planning-permission/planning-permission-for-hmos/"},
-            {"title": "Liverpool Express: Liverpool to limit rise of HMO conversions",
-             "url": "https://liverpoolexpress.co.uk/liverpool-to-limit-rise-of-hmo-conversions/"},
-        ],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)",
-        "category": "Article 4 coming",
-        "councils": ["Liverpool"],
-        "postcodes": ["L13", "L9 8BX", "L9 7AL", "L4", "L5"],
-        "status": "Cabinet approved 13 Oct 2026; called in for scrutiny 29 Oct 2026, so not settled",
-        "key_date": "Immediate areas now (if upheld); rest of the city about October 2027",
-        "summary": ("Cabinet approved immediate Article 4 controls in more areas: Kirkdale, Everton, County, Walton, "
-                    "Orrell Park and part of Fazakerley, part of Tuebrook Larkhill, Old Swan and part of Stoneycroft, "
-                    "Penny Lane, and parts of Calderstones and St Michaels and Sefton Park. A separate direction for the "
-                    "rest of the city is intended to start around October 2027. Opposition councillors called the "
-                    "decision in, so details and timing may change."),
-        "impact": ("If upheld, new small HMOs in Old Swan, Orrell Park and part of Fazakerley need planning "
-                   "permission now, and everywhere else in Liverpool from about late 2027. Check the council's "
-                   "decision record before buying for HMO use."),
-        "sources": [
-            {"title": "PlanningGeek: call-in delays new Article 4 controls",
-             "url": "https://www.planninggeek.co.uk/2026/liverpool-hmo-call-in/"},
-            {"title": "LandlordZone: Liverpool plans Article 4 expansion",
-             "url": "https://www.landlordzone.co.uk/news/liverpool-plans-article-4-expansion-to-curb-hmo-growth"},
-            {"title": "Birkenhead News: decision called in",
-             "url": "https://www.birkenhead.news/liverpool-hmo-decision-called-in/"},
-            {"title": "Brit Brief: Liverpool expands HMO controls",
-             "url": "https://britbrief.co.uk/business/property/liverpool-expands-hmo-controls-to-five-more-areas.html"},
-        ],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Preston: HMO Article 4",
-        "category": "Article 4 coming",
-        "councils": ["Preston"],
-        "postcodes": ["PR1", "PR2"],
-        "status": "Made 29 Jan 2026; consultation closed 19 Mar 2026; needs confirming by the council",
-        "key_date": "2027-02-15",
-        "summary": "A non-immediate HMO Article 4 direction that would take effect on 15 February 2027 if confirmed.",
-        "impact": "New small HMOs in the covered area would need planning permission from that date.",
-        "sources": [{"title": "Preston City Council: Article 4 Direction on HMOs",
-                     "url": "https://www.preston.gov.uk/article/12132/Article-4-Direction-on-HMOs"}],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Hertsmere (Potters Bar): HMO Article 4",
-        "category": "Article 4 coming",
-        "councils": ["Hertsmere"],
-        "postcodes": ["EN6"],
-        "status": "Consultation ran to 17 Jun 2026; needs confirming",
-        "key_date": "May 2027",
-        "summary": "A proposed HMO Article 4 direction for Potters Bar, due to come into force in May 2027 if confirmed.",
-        "impact": "New small HMOs in Potters Bar would need planning permission.",
-        "sources": [{"title": "Hertsmere Borough Council: consultation",
-                     "url": "https://www.hertsmere.gov.uk/news/residents-invited-to-comment-on-proposed-article-4-direction-in-relation-to-hmos-in-potters-bar"}],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "North Tyneside: HMO Article 4 in eight wards",
-        "category": "Article 4 coming",
-        "councils": ["North Tyneside"],
-        "postcodes": ["NE28", "NE29", "NE30"],
-        "status": "Made 6 Aug 2026; consultation closed 22 Oct 2026; needs confirming",
-        "key_date": "2027-08-06",
-        "summary": "A non-immediate HMO Article 4 direction covering eight wards, proposed to start 6 August 2027.",
-        "impact": "New small HMOs in those wards would need planning permission from that date.",
-        "sources": [{"title": "PlanningGeek: North Tyneside HMO Article 4",
-                     "url": "https://www.planninggeek.co.uk/2026/north-tyneside-hmo-article-4/"}],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Burnley: HMO Article 4 extending to six more wards",
-        "category": "Article 4 coming",
-        "councils": ["Burnley"],
-        "postcodes": ["BB10", "BB11", "BB12"],
-        "status": "Made 25 Sep 2026; consultation closed 6 Nov 2026; needs confirming",
-        "key_date": "2027-09-27",
-        "summary": "A further HMO Article 4 direction for six wards, scheduled to take effect on 27 September 2027 "
-                   "if confirmed. An earlier Burnley direction is also due for a decision in spring 2027.",
-        "impact": "New small HMOs in the covered wards would need planning permission.",
-        "sources": [{"title": "PlanningGeek: Burnley HMO Article 4",
-                     "url": "https://www.planninggeek.co.uk/2026/burnley-hmo-article-4-made/"},
-                    {"title": "Burnley Council: Article 4 (HMOs)",
-                     "url": "https://burnley.gov.uk/planning/planning-permission/do-i-need-planning-permission/article4/article-4-direction-houses-in-multiple-occupation/"}],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Bury: borough-wide HMO Article 4",
-        "category": "Article 4 in force",
-        "councils": ["Bury"],
-        "postcodes": ["BL9", "BL8"],
-        "status": "Immediate direction in force since 16 Jul 2026; lapses unless confirmed within 6 months",
-        "key_date": "2027-01-16 (confirmation deadline)",
-        "summary": "An immediate, borough-wide HMO Article 4 direction. It must be confirmed within six months "
-                   "of coming into force or it expires.",
-        "impact": "New small HMOs across Bury need planning permission now.",
-        "sources": [{"title": "Bury Council: Article 4 directions",
-                     "url": "https://www.bury.gov.uk/planning-building-control/planning-permission/article-4-directions"}],
-        "checked": "2026-11-11",
-    },
-    {
-        "title": "Sizewell C nuclear power station (Suffolk)",
-        "category": "Major project",
-        "councils": ["East Suffolk"],
-        "postcodes": ["IP16", "IP17"],
-        "status": "Main construction phase; formal construction began January 2024",
-        "key_date": "Construction ongoing through the 2030s",
-        "summary": ("Almost 2,000 workers on site and nearly £1bn of contracts awarded to East of England "
-                    "businesses by January 2026. Haul road, marine import facility, the Sizewell Link Road and "
-                    "the Two Village Bypass were all under construction in 2026."),
-        "impact": ("A large construction workforce drives demand for rooms, HMOs and short lets in towns like "
-                   "Leiston (IP16) and Saxmundham (IP17), and further out to Ipswich. That demand tends to fall "
-                   "as construction winds down, so check how long a tenant base will last."),
-        "sources": [
-            {"title": "New Civil Engineer: two-year construction milestone",
-             "url": "https://www.newcivilengineer.com/latest/sizewell-c-has-awarded-almost-1bn-in-local-contracts-at-two-year-mark-of-construction-16-01-2026/"},
-            {"title": "Aldeburgh Town Council: construction update (June 2026)",
-             "url": "https://www.aldeburghtowncouncil.gov.uk/2026/06/sizewell-c-construction-update/"},
-            {"title": "Sizewell C annual report FY25/26",
-             "url": "https://www.sizewellc.com/wp-content/uploads/2026/07/Annual-Report-2025-26.pdf"},
-        ],
-        "checked": "2026-11-11",
-    },
+ {
+  "title": "Bristol: HMO Article 4 extending to six more areas",
+  "category": "Article 4 coming",
+  "stage": "Expansion",
+  "councils": [
+   "Bristol, City of"
+  ],
+  "postcodes": [
+   "BS4",
+   "BS5",
+   "BS7",
+   "BS10",
+   "BS16"
+  ],
+  "status": "Reported to take effect 1 Jan 2027",
+  "key_date": "2027-01-01",
+  "where": "Brislington, Frome Vale, Purdown, Southmead and Horfield, St George, Westbury Park",
+  "summary": "Bristol is adding six more areas to its existing small-HMO controls.",
+  "impact": "New small HMOs in these areas will need planning permission from the start date.",
+  "sources": [
+   {
+    "title": "PlanWatch: Article 4 HMO directions by council",
+    "url": "https://planwatch.co.uk/guides/article-4-hmo-directions-by-council"
+   },
+   {
+    "title": "Planning Geek: Article 4 HMO map",
+    "url": "https://www.planninggeek.co.uk/gpdo/article-4/hmos/"
+   }
+  ],
+  "link": "https://planwatch.co.uk/guides/article-4-hmo-directions-by-council",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Preston: HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Preston"
+  ],
+  "postcodes": [
+   "PR1",
+   "PR2"
+  ],
+  "status": "Made 29 Jan 2026; takes effect 15 Feb 2027 if the council confirms it",
+  "key_date": "2027-02-15",
+  "where": "The areas on the council's map",
+  "summary": "A non-immediate direction; it only starts if the council confirms it.",
+  "impact": "New small HMOs in the covered area would need planning permission from 15 Feb 2027.",
+  "sources": [
+   {
+    "title": "Preston City Council: Article 4 Direction on HMOs",
+    "url": "https://www.preston.gov.uk/article/12132/Article-4-Direction-on-HMOs"
+   }
+  ],
+  "link": "https://www.preston.gov.uk/article/12132/Article-4-Direction-on-HMOs",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Wyre Forest (Kidderminster): HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Wyre Forest"
+  ],
+  "postcodes": [
+   "DY10",
+   "DY11"
+  ],
+  "status": "Reported to take effect around 20 Feb 2027",
+  "key_date": "2027-02-20",
+  "where": "Kidderminster",
+  "summary": "Wyre Forest consulted on removing the right to convert homes to small HMOs in Kidderminster.",
+  "impact": "New small HMOs in Kidderminster would need planning permission.",
+  "sources": [
+   {
+    "title": "Article 4 Checker: Wyre Forest",
+    "url": "https://article4checker.com/article-4/wyre-forest-district-council/"
+   },
+   {
+    "title": "PlanWatch",
+    "url": "https://planwatch.co.uk/guides/article-4-hmo-directions-by-council"
+   }
+  ],
+  "link": "https://article4checker.com/article-4/wyre-forest-district-council/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Telford and Wrekin: HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Telford and Wrekin"
+  ],
+  "postcodes": [
+   "TF1",
+   "TF2",
+   "TF3"
+  ],
+  "status": "Confirmed 26 Feb 2026; comes into force 27 Feb 2027",
+  "key_date": "2027-02-27",
+  "where": "The area set by the council (see its page)",
+  "summary": "Removes the right to turn a family home into a small HMO (up to 6 people) without planning permission.",
+  "impact": "From 27 Feb 2027 new small HMOs need planning permission. The council says it is confirmed.",
+  "sources": [
+   {
+    "title": "Telford & Wrekin Council: Article 4 Direction",
+    "url": "https://www.telford.gov.uk/planning-and-building-control/planning-applications-and-advice-appeals-enforcement-and-guidance/article-4-direction/"
+   }
+  ],
+  "link": "https://www.telford.gov.uk/planning-and-building-control/planning-applications-and-advice-appeals-enforcement-and-guidance/article-4-direction/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Gloucester: HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Gloucester"
+  ],
+  "postcodes": [
+   "GL1",
+   "GL2"
+  ],
+  "status": "Confirmed; comes into force 3 Mar 2027",
+  "key_date": "2027-03-03",
+  "where": "Several areas of Gloucester (council map)",
+  "summary": "A confirmed non-immediate direction for small HMOs.",
+  "impact": "New small HMOs in the mapped areas need planning permission from 3 Mar 2027.",
+  "sources": [
+   {
+    "title": "Gloucester City Council: Article 4 Direction",
+    "url": "https://www.gloucester.gov.uk/planning-development/article-4-direction-consultation/"
+   }
+  ],
+  "link": "https://www.gloucester.gov.uk/planning-development/article-4-direction-consultation/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Erewash: HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Erewash"
+  ],
+  "postcodes": [
+   "DE7",
+   "NG10"
+  ],
+  "status": "Takes effect 6 Mar 2027 (council page)",
+  "key_date": "2027-03-06",
+  "where": "The areas on the council's map (Ilkeston and Long Eaton areas)",
+  "summary": "Erewash is removing the right to convert homes to small HMOs without permission.",
+  "impact": "New small HMOs in the covered areas need planning permission from 6 Mar 2027.",
+  "sources": [
+   {
+    "title": "Erewash Borough Council: Article 4 Direction (HMOs)",
+    "url": "https://www.erewash.gov.uk/planning/planning-information/proposed-article-4-direction"
+   }
+  ],
+  "link": "https://www.erewash.gov.uk/planning/planning-information/proposed-article-4-direction",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Stockton-on-Tees: borough-wide HMO Article 4 (unconfirmed)",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Stockton-on-Tees"
+  ],
+  "postcodes": [
+   "TS17",
+   "TS18"
+  ],
+  "status": "Sources conflict: one lists 22 Mar 2027, another says not yet made",
+  "key_date": "2027-03-22",
+  "where": "Borough-wide (proposed)",
+  "summary": "A borough-wide non-immediate direction is being pursued; the date isn't confirmed by the council.",
+  "impact": "Check the council's own page before relying on any date.",
+  "sources": [
+   {
+    "title": "Planning Geek: Article 4 HMO map",
+    "url": "https://www.planninggeek.co.uk/gpdo/article-4/hmos/"
+   },
+   {
+    "title": "PlanWatch",
+    "url": "https://planwatch.co.uk/guides/article-4-hmo-directions-by-council"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/gpdo/article-4/hmos/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Hertsmere (Potters Bar): HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Hertsmere"
+  ],
+  "postcodes": [
+   "EN6"
+  ],
+  "status": "Confirmed; operative 6 May 2027",
+  "key_date": "2027-05-06",
+  "where": "Parts of Potters Bar",
+  "summary": "Made 23 Apr 2026 with a 12-month lead-in, since confirmed.",
+  "impact": "New small HMOs in the covered parts of Potters Bar need planning permission from 6 May 2027.",
+  "sources": [
+   {
+    "title": "Planning Geek: Potters Bar Article 4 confirmed",
+    "url": "https://www.planninggeek.co.uk/2026/potters-bar-article-4/"
+   },
+   {
+    "title": "Hertsmere Borough Council",
+    "url": "https://www.hertsmere.gov.uk/planning-building-control/building-tree-conservation/article-4-directions/hmo-consultation-page"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/potters-bar-article-4/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Three Rivers: HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Three Rivers"
+  ],
+  "postcodes": [
+   "WD3",
+   "WD18"
+  ],
+  "status": "Consultation closed 16 Aug 2026; listed to start 17 Jun 2027",
+  "key_date": "2027-06-17",
+  "where": "The areas on the council's map",
+  "summary": "Three Rivers consulted on removing the right to convert homes to small HMOs.",
+  "impact": "New small HMOs would need planning permission from mid-June 2027 if confirmed.",
+  "sources": [
+   {
+    "title": "Three Rivers District Council: Article 4",
+    "url": "https://www.threerivers.gov.uk/services/planning/planning-policy/article-4"
+   },
+   {
+    "title": "Planning Geek: Article 4 HMO map",
+    "url": "https://www.planninggeek.co.uk/gpdo/article-4/hmos/"
+   }
+  ],
+  "link": "https://www.threerivers.gov.uk/services/planning/planning-policy/article-4",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "North Tyneside: HMO Article 4 in eight wards",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "North Tyneside"
+  ],
+  "postcodes": [
+   "NE28",
+   "NE29",
+   "NE30"
+  ],
+  "status": "Made 6 Aug 2026; consultation closed 22 Oct 2026; needs confirming",
+  "key_date": "2027-08-06",
+  "where": "Eight North Tyneside wards (named in the council report)",
+  "summary": "A non-immediate direction covering eight wards.",
+  "impact": "New small HMOs in those wards would need planning permission from 6 Aug 2027.",
+  "sources": [
+   {
+    "title": "North Tyneside Council report",
+    "url": "https://democracy.northtyneside.gov.uk/documents/s37458/Art%204%20Direction%20HMOs%20July%202026%20-%20final%20version.pdf"
+   },
+   {
+    "title": "Planning Geek: North Tyneside",
+    "url": "https://www.planninggeek.co.uk/2026/north-tyneside-hmo-article-4/"
+   }
+  ],
+  "link": "https://democracy.northtyneside.gov.uk/documents/s37458/Art%204%20Direction%20HMOs%20July%202026%20-%20final%20version.pdf",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Havering: borough-wide HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Havering"
+  ],
+  "postcodes": [
+   "RM1",
+   "RM3",
+   "RM7"
+  ],
+  "status": "Made 20 Aug 2026; proposed start 7 Sep 2027 if confirmed",
+  "key_date": "2027-09-07",
+  "where": "The whole of Havering",
+  "summary": "Havering proposes to require planning permission for all new HMOs across the borough.",
+  "impact": "New HMOs anywhere in Havering would need planning permission from September 2027.",
+  "sources": [
+   {
+    "title": "Havering consultation",
+    "url": "https://consultation.havering.gov.uk/planning/hmo-article-4-direction-consultation/"
+   },
+   {
+    "title": "Planning Geek: Havering",
+    "url": "https://www.planninggeek.co.uk/2026/havering-hmo-article-4-direction/"
+   }
+  ],
+  "link": "https://consultation.havering.gov.uk/planning/hmo-article-4-direction-consultation/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Burnley: HMO Article 4 extending to six more wards",
+  "category": "Article 4 coming",
+  "stage": "Expansion",
+  "councils": [
+   "Burnley"
+  ],
+  "postcodes": [
+   "BB10",
+   "BB11",
+   "BB12"
+  ],
+  "status": "Made 25 Sep 2026; consultation closed 6 Nov 2026; needs confirming",
+  "key_date": "2027-09-27",
+  "where": "Six more wards on top of those already covered (named in the linked article)",
+  "summary": "A further non-immediate direction to cover the rest of Burnley.",
+  "impact": "New small HMOs in those wards would need planning permission from 27 Sep 2027.",
+  "sources": [
+   {
+    "title": "Planning Geek: Burnley Article 4 made",
+    "url": "https://www.planninggeek.co.uk/2026/burnley-hmo-article-4-made/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/burnley-hmo-article-4-made/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Liverpool: HMO Article 4 for the rest of the city",
+  "category": "Article 4 coming",
+  "stage": "Expansion",
+  "councils": [
+   "Liverpool"
+  ],
+  "postcodes": [
+   "L15",
+   "L13",
+   "L18",
+   "L17",
+   "L11",
+   "L12"
+  ],
+  "status": "Planned for 5 Nov 2027 if confirmed",
+  "key_date": "2027-11-05",
+  "where": "Every part of Liverpool not already covered. Already covered: the 2021 wards (incl. Wavertree) and, since 5 Nov 2026, five more areas incl. Orrell Park, Old Swan and part of Fazakerley",
+  "summary": "A non-immediate direction to extend small-HMO controls to the whole city.",
+  "impact": "From Nov 2027 any new small HMO in Liverpool would need planning permission. Existing lawful HMOs aren't affected.",
+  "sources": [
+   {
+    "title": "Planning Geek: Liverpool HMO controls take effect",
+    "url": "https://www.planninggeek.co.uk/2026/liverpool-hmo-controls/"
+   },
+   {
+    "title": "Liverpool City Council: HMOs",
+    "url": "https://liverpool.gov.uk/planning-and-building-control/planning-permission/planning-permission-for-hmos/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/liverpool-hmo-controls/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Hammersmith & Fulham: borough-wide small HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Hammersmith and Fulham"
+  ],
+  "postcodes": [
+   "W6",
+   "W12",
+   "SW6"
+  ],
+  "status": "Cabinet report Feb 2026; non-immediate, about a year after it's made; no date found",
+  "key_date": "2027",
+  "where": "The whole borough (proposed)",
+  "summary": "The council favours a borough-wide non-immediate direction for small HMOs.",
+  "impact": "Expect planning permission to be needed for new small HMOs from around 2027; check for the confirmed date.",
+  "sources": [
+   {
+    "title": "H&F cabinet report",
+    "url": "https://democracy.lbhf.gov.uk/documents/s133735/Article%204%20Direction%20Small%20Houses%20In%20Multiple%20Occupation.pdf"
+   },
+   {
+    "title": "LandlordZone",
+    "url": "https://www.landlordzone.co.uk/news/london-borough-seeks-to-halt-spread-of-hmos"
+   }
+  ],
+  "link": "https://democracy.lbhf.gov.uk/documents/s133735/Article%204%20Direction%20Small%20Houses%20In%20Multiple%20Occupation.pdf",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Gedling (Netherfield): HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Coming",
+  "councils": [
+   "Gedling"
+  ],
+  "postcodes": [
+   "NG4"
+  ],
+  "status": "Made 6 Jul 2026; consultation closed 21 Aug 2026; must be confirmed by 6 Jul 2028",
+  "key_date": "2028-07-06",
+  "where": "Netherfield",
+  "summary": "A direction for Netherfield, awaiting confirmation.",
+  "impact": "Check the council page for the date it takes effect.",
+  "sources": [
+   {
+    "title": "Gedling Borough Council: Netherfield Article 4",
+    "url": "https://www.gedling.gov.uk/planning-and-building-control/planning/netherfield-houses-multiple-occupation-article-41-direction"
+   }
+  ],
+  "link": "https://www.gedling.gov.uk/planning-and-building-control/planning/netherfield-houses-multiple-occupation-article-41-direction",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Cambridge: HMO Article 4 being prepared",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Cambridge"
+  ],
+  "postcodes": [
+   "CB1",
+   "CB4"
+  ],
+  "status": "Councillors agreed on 21 Oct 2026 to prepare it; not yet made",
+  "key_date": "2028-01-03",
+  "where": "To be decided",
+  "summary": "A non-immediate direction is being prepared; 3 Jan 2028 is only an indicative start date.",
+  "impact": "Likely to need planning permission for new small HMOs from 2028.",
+  "sources": [
+   {
+    "title": "Planning Geek: Cambridge HMO controls approved",
+    "url": "https://www.planninggeek.co.uk/2026/cambridge-hmo-controls-approved/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/cambridge-hmo-controls-approved/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Reading: HMO Article 4 could expand",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Reading"
+  ],
+  "postcodes": [
+   "RG1",
+   "RG30"
+  ],
+  "status": "Draft; would start 12 months after it's made",
+  "key_date": "2028",
+  "where": "Areas proposed in the committee report",
+  "summary": "Reading is considering extending its HMO controls.",
+  "impact": "Watch for the direction being made; the start is a year later.",
+  "sources": [
+   {
+    "title": "Planning Geek: Reading",
+    "url": "https://www.planninggeek.co.uk/2026/reading-hmo-controls/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/reading-hmo-controls/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Newcastle: HMO Article 4 under consideration",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Newcastle upon Tyne"
+  ],
+  "postcodes": [
+   "NE4",
+   "NE6"
+  ],
+  "status": "Under consideration; no date",
+  "key_date": "",
+  "where": "To be decided",
+  "summary": "Newcastle is considering a further HMO direction.",
+  "impact": "Early stage; watch for a decision.",
+  "sources": [
+   {
+    "title": "Planning Geek: Newcastle",
+    "url": "https://www.planninggeek.co.uk/2026/newcastle-hmo-article-4/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/newcastle-hmo-article-4/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Luton: possible HMO Article 4",
+  "category": "Article 4 coming",
+  "stage": "Proposed",
+  "councils": [
+   "Luton"
+  ],
+  "postcodes": [
+   "LU1",
+   "LU2"
+  ],
+  "status": "Gathering evidence; no date",
+  "key_date": "",
+  "where": "To be decided",
+  "summary": "Luton is collecting evidence for a possible direction.",
+  "impact": "Early stage; watch for a decision.",
+  "sources": [
+   {
+    "title": "Planning Geek: Luton",
+    "url": "https://www.planninggeek.co.uk/2026/luton-hmo-article-4/"
+   }
+  ],
+  "link": "https://www.planninggeek.co.uk/2026/luton-hmo-article-4/",
+  "checked": "2026-11-12"
+ },
+ {
+  "title": "Sizewell C nuclear power station (Suffolk)",
+  "category": "Major project",
+  "stage": "Project underway",
+  "councils": [
+   "East Suffolk"
+  ],
+  "postcodes": [
+   "IP16",
+   "IP17"
+  ],
+  "status": "Main construction phase; formal construction began January 2024",
+  "key_date": "Construction ongoing through the 2030s",
+  "where": "Sizewell, near Leiston (IP16); knock-on demand in Saxmundham (IP17) and Ipswich",
+  "summary": "Almost 2,000 workers on site and nearly £1bn of contracts awarded to East of England businesses by January 2026. Haul road, marine import facility, the Sizewell Link Road and the Two Village Bypass were all under construction in 2026.",
+  "impact": "A large construction workforce drives demand for rooms, HMOs and short lets in towns like Leiston and Saxmundham, and further out to Ipswich. That demand tends to fall as construction winds down.",
+  "sources": [
+   {
+    "title": "New Civil Engineer: two-year construction milestone",
+    "url": "https://www.newcivilengineer.com/latest/sizewell-c-has-awarded-almost-1bn-in-local-contracts-at-two-year-mark-of-construction-16-01-2026/"
+   },
+   {
+    "title": "Aldeburgh Town Council: construction update",
+    "url": "https://www.aldeburghtowncouncil.gov.uk/2026/06/sizewell-c-construction-update/"
+   }
+  ],
+  "link": "https://www.newcivilengineer.com/latest/sizewell-c-has-awarded-almost-1bn-in-local-contracts-at-two-year-mark-of-construction-16-01-2026/",
+  "checked": "2026-11-12"
+ }
 ]
 
 
@@ -296,7 +707,7 @@ class HotList:
         for v in range(done + 1, SEED_VERSION + 1):
             for title in REPLACED_SEEDS.get(v, []):
                 for e in self.all():
-                    if e["title"] == title and e.get("checked") == "2026-11-11":
+                    if e["title"] == title and e.get("checked") in ("2026-11-11", "2026-11-12"):
                         self.delete(e["id"])
         existing = {e["title"] for e in self.all()}
         for d in SEED:
@@ -308,7 +719,7 @@ class HotList:
     @staticmethod
     def _complete(e: dict) -> dict:
         """Fill stage / where / link for entries saved before those fields existed."""
-        extra = SEED_EXTRA.get(e.get("title"), {})
+        extra = SEED_EXTRA.get(e.get("title")) or next((d for d in SEED if d["title"] == e.get("title")), {})
         for k in ("stage", "where", "link"):
             if not e.get(k):
                 e[k] = extra.get(k, "")
@@ -338,6 +749,30 @@ class HotList:
         self.conn.execute("DELETE FROM hotlist WHERE id=?", (entry_id,))
         self.conn.commit()
 
+    @staticmethod
+    def is_upcoming(e: dict, today: date | None = None) -> bool:
+        """Still ahead of us: not already in force, and its date (if it has one) hasn't passed."""
+        if e.get("stage") == "In force":
+            return False
+        if e.get("category") == "Major project":
+            return True
+        import re as _re
+        m = _re.match(r"(\d{4}-\d{2}-\d{2})", str(e.get("key_date") or ""))
+        return not m or m.group(1) >= (today or date.today()).isoformat()
+
+    @staticmethod
+    def sort_key(e: dict):
+        import re as _re
+        m = _re.match(r"(\d{4})(?:-(\d{2})-(\d{2}))?", str(e.get("key_date") or ""))
+        when = (m.group(0) if m.group(2) else m.group(1) + "-12-31") if m else "9999"   # "2027" = some time in 2027
+        return (e.get("category") == "Major project", when, e["title"].lower())
+
+    def upcoming(self, today: date | None = None) -> list[dict]:
+        return sorted((e for e in self.all() if self.is_upcoming(e, today)), key=self.sort_key)
+
+    def past(self, today: date | None = None) -> list[dict]:
+        return sorted((e for e in self.all() if not self.is_upcoming(e, today)), key=self.sort_key)
+
     def for_councils(self, councils: set[str]) -> list[dict]:
         wanted = {council_key(c) for c in councils}
-        return [e for e in self.all() if wanted & {council_key(c) for c in e["councils"]}]
+        return [e for e in self.upcoming() if wanted & {council_key(c) for c in e["councils"]}]

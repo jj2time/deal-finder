@@ -103,7 +103,7 @@ def test_condition_report_on_property_page(tmp_path, monkeypatch, cfg):
     app = create_app(cfg)
     c = TestClient(app)
     page = c.get("/deal/rightmove:1").text
-    assert "📷 Condition report" in page and "Analyse the photos of https://www.rightmove.co.uk/properties/1" in page
+    assert "📷 Condition report" in page and "analysePhotos('https://www.rightmove.co.uk/properties/1')" in page
     from dealfinder.claude_connector import save_report
     monkeypatch.setattr("dealfinder.claude_connector.load_config", lambda: cfg)
     assert save_report("https://www.rightmove.co.uk/properties/1", "Kitchen: Poor (photo 3).", 9000, 16000) == "rightmove:1"

@@ -132,6 +132,8 @@
         <div>{% for m in a.strategies %}<span class="tag {% if m.name in s.deals %}on{% endif %}" title="{{ m.reason }}">{{ m.name }}</span>{% endfor %}</div>
         {% if a.comparison_warning %}<div class="small warntext">{{ a.comparison_warning }}</div>{% endif %}
         <div class="actions"><a class="btn small" href="/deal/{{ l.key }}">Full details</a>
+          {% if l.url and 'rightmove.co.uk/properties/' in l.url %}{% if l.key in report_keys %}<a class="btn alt small" href="/report/{{ l.key }}">📷 Report ready</a>{% endif %}
+          <button type="button" class="btn alt small" onclick="analysePhotos('{{ l.url }}')">📷 {{ 'Analyse again' if l.key in report_keys else 'Analyse photos' }}</button>{% endif %}
           <a class="btn alt small" href="/deal/{{ l.key }}/post">Deal post</a>
           {% if l.url %}<a class="btn alt small" href="{{ l.url }}" target="_blank" rel="noopener">View on {{ l.source|capitalize }}</a>{% endif %}</div>
       </div>
@@ -144,8 +146,8 @@
 {% endif %}
 
 <details class="card" id="hotlist" open>
-  <summary><h3 style="display:inline">🔥 Hot list</h3> <span class="muted small">— areas with something going on ({{ hotlist_entries|length }})</span></summary>
-  <p class="muted small" style="margin:6px 0 10px">Article 4 restrictions coming in, big projects, regeneration. Searches in these councils show a heads-up. Dates change — check with the council.
+  <summary><h3 style="display:inline">🔥 Hot list</h3> <span class="muted small">— what's coming up, soonest first ({{ hotlist_entries|length }})</span></summary>
+  <p class="muted small" style="margin:6px 0 10px">New HMO Article 4 rules coming in 2027–2028, big projects and regeneration. Anything already in force drops off automatically. Searches in these councils show a heads-up. Dates change — check with the council.
     <a href="/hotlist?new=1#form">Add an entry</a> · <a href="/hotlist">Full details and editing</a></p>
   <div class="scroll"><table class="hotlist">
   <thead><tr><th>Stage</th><th>What</th><th>Where</th><th>When</th><th>Details</th></tr></thead>

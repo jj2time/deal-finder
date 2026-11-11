@@ -84,11 +84,13 @@ def register(app, templates, ctx, state, db, start_job, postcodes, scan_errors):
     # ---- hot list ----
     @app.get("/hotlist", response_class=HTMLResponse)
     def hot_list(request: Request, edit: str = "", new: str = ""):
-        entries = hotlist.all()
+        entries = hotlist.upcoming()
+        past = hotlist.past()
         editing = hotlist.get(edit) if edit else ({} if new else None)
         area_codes = {a["name"].lower(): a["code"] for a in store.all()}
         return templates.TemplateResponse(request, "hotlist.html", ctx(
-            request, entries=entries, categories=CATEGORIES, stages=STAGES, editing=editing, area_codes=area_codes))
+            request, entries=entries, past=past, categories=CATEGORIES, stages=STAGES, editing=editing,
+            area_codes=area_codes))
 
     @app.post("/hotlist")
     async def hot_save(request: Request):

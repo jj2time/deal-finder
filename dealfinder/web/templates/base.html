@@ -89,13 +89,15 @@
   .stage-project-underway { background:#e7f1fb; color:#1b4f80; }
   table.hotlist th { white-space:nowrap; }
   .report { white-space:pre-wrap; font-size:14px; line-height:1.55; background:var(--bg); border-radius:8px; padding:12px; max-height:640px; overflow:auto; }
+  .toast { position:fixed; right:16px; bottom:16px; max-width:420px; background:#fff; border:2px solid var(--accent); border-radius:10px; padding:14px; box-shadow:0 6px 24px rgba(0,0,0,.18); z-index:1000; display:flex; flex-direction:column; gap:8px; }
+  .toast[hidden] { display:none; }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>
 </head>
 <body>
 <header><h1><a href="/">Deal Finder</a></h1>
-<nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a></nav>
+<nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a><a href="/photos">📷 Photo check</a></nav>
 {% if app_version is defined %}
   {% if update_available %}<form method="post" action="/updates/install" style="margin:0"><button class="btn small" title="Install the new version now">⬆️ Update now</button></form>
   {% elif has_update_key %}<form method="post" action="/updates/check" style="margin:0"><input type="hidden" name="back" value="{{ request.url.path }}"><button class="btn alt small" title="Check GitHub for a newer version">⬆️ Check for updates · v{{ app_version.split('-')[0] }}</button></form>
@@ -107,5 +109,23 @@
 <form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? It stops running in the background until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
 <main>{% block content %}{% endblock %}</main>
 <footer>Estimates only, not financial advice. Contains HM Land Registry data © Crown copyright and database right {{ year }}. This data is licensed under the Open Government Licence v3.0.</footer>
+<div id="photo-toast" class="toast" hidden></div>
+<script>
+  // 📷 Analyse photos: opens Claude Desktop and copies the instruction, so it's just Cmd+V and Enter there.
+  async function analysePhotos(property) {
+    const t = document.getElementById('photo-toast');
+    const show = (html) => { t.innerHTML = html + '<button class="btn alt small" onclick="this.parentNode.hidden=true">Close</button>'; t.hidden = false; };
+    try {
+      const r = await fetch('/photos/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({property})});
+      const d = await r.json();
+      if (!r.ok) return show('<b>Hmm.</b> ' + d.error);
+      try { await navigator.clipboard.writeText(d.prompt); } catch (e) {}
+      if (!d.connected) return show('<b>One-time setup needed.</b> Connect Claude Desktop in <a href="/settings#claude">Settings</a> first, then try again.');
+      show('<b>📷 Copied!</b> ' + (d.opened ? 'Claude Desktop is opening — ' : 'Open Claude Desktop, then ') +
+           'press <b>Cmd+V</b> and <b>Enter</b>.<br><span class="small">The report will appear on the <a href="/photos">📷 Photo check</a> tab when Claude has finished.</span>' +
+           '<br><span class="small muted">Copied text: ' + d.prompt.replace(/</g, '&lt;') + '</span>');
+    } catch (e) { show('<b>Hmm.</b> Deal Finder didn\'t respond. Is it still running?'); }
+  }
+</script>
 </body>
 </html>

@@ -266,7 +266,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == page_query(s, names),
             hot=hot, hot_ticked=names, searches=searches, fetched=fetched, heads_up=heads_up,
-            hotlist_entries=app.state.hotlist.all(), digest=db.digest() if not s.area and batch_keys is None else [],
+            hotlist_entries=app.state.hotlist.upcoming(),
+            report_keys=__import__("dealfinder.claude_connector", fromlist=["report_keys"]).report_keys(db), digest=db.digest() if not s.area and batch_keys is None else [],
             daily_on=bool((state["cfg"].get("schedule") or {}).get("enabled")),
             daily_at=str((state["cfg"].get("schedule") or {}).get("daily_at", "07:30")),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
@@ -448,6 +449,9 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     def digest_clear():
         db.clear_digest()
         return RedirectResponse("/", status_code=303)
+
+    from .photo_pages import register as register_photo_pages
+    register_photo_pages(app, TEMPLATES, ctx, db)
 
     from .area_pages import register as register_area_pages
     hot_for_council = register_area_pages(app, TEMPLATES, ctx, state, db, start_job, postcodes,

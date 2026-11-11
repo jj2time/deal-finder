@@ -90,9 +90,8 @@ def test_hotlist_seed_edit_and_lookup(tmp_path):
     assert len(hl.all()) == len(SEED)
     assert HotList(db) and len(hl.all()) == len(SEED)                    # seeding happens once
     liv = hl.for_councils({"Liverpool"})
-    assert len(liv) == 2 and {e["category"] for e in liv} == {"Article 4 in force", "Article 4 coming"}
-    assert any("17 June 2021" in e["status"] and "Wavertree" in e["summary"] for e in liv)
-    assert any("Orrell Park" in e["summary"] and "called in" in e["status"] for e in liv)
+    assert [e["title"] for e in liv] == ["Liverpool: HMO Article 4 for the rest of the city"]
+    assert "Orrell Park" in liv[0]["where"] and liv[0]["key_date"] == "2027-11-05" and liv[0]["sources"]
     assert hl.for_councils({"sefton"}) == []
     e = hl.save({"title": "Leeds: Headingley", "category": "Article 4 coming", "councils": "Leeds",
                  "postcodes": "ls6, ls4", "sources": "Leeds council | https://www.leeds.gov.uk/x\nnot a link"})
@@ -136,13 +135,13 @@ def test_pages(tmp_path, monkeypatch, cfg):
 
     report = client.get("/areas/E08000012", params={"type": "terraced"}).text
     assert "Why Liverpool (terraced)" in report and "not a forecast" in report
-    assert "Liverpool: HMO Article 4 in force since June 2021" in report and "Search within 3 miles of L3" in report
+    assert "Liverpool: HMO Article 4 for the rest of the city" in report and "Search within 3 miles of L3" in report
 
     home = client.get("/").text                                         # hot list is on the main page
     assert "🔥 Hot list" in home and "Sizewell C" in home and "Liverpool: HMO Article 4" in home
     assert 'href="/hotlist"' not in home.split("<main>")[0]              # no longer a menu tab
     hot = client.get("/hotlist").text
-    assert "Sizewell C" in hot and "Liverpool area report" in hot and "Search L9 8BX" in hot
+    assert "Sizewell C" in hot and "Liverpool area report" in hot and "Search L13" in hot
     r = client.post("/hotlist", data={"title": "Test regen", "category": "Regeneration", "councils": "Bristol, City of",
                                       "postcodes": "BS5", "status": "Planned", "checked": "2026-11-11"})
     assert r.status_code == 200 and "Test regen" in r.text
@@ -170,16 +169,16 @@ def test_old_liverpool_entry_replaced_on_upgrade(tmp_path):
     titles = [e["title"] for e in HotList(db).all()]
     assert "Liverpool: HMO Article 4 spreading across the city" not in titles
     assert "My own Leeds note" in titles
-    assert sum(t.startswith("Liverpool: HMO Article 4") for t in titles) == 2
+    assert [t for t in titles if t.startswith("Liverpool: HMO Article 4")] == ["Liverpool: HMO Article 4 for the rest of the city"]
 
 
 def test_stage_where_and_link(tmp_path, monkeypatch, cfg):
     db = DB(str(tmp_path / "x.sqlite3"))
     hl = HotList(db)
     by = {e["title"]: e for e in hl.all()}
-    exp = by["Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)"]
+    exp = by["Liverpool: HMO Article 4 for the rest of the city"]
     assert exp["stage"] == "Expansion" and "Orrell Park" in exp["where"] and exp["link"].startswith("https://")
-    assert by["Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)"]["stage"] == "In force"
+    assert by["Telford and Wrekin: HMO Article 4"]["stage"] == "Coming"
     assert by["Sizewell C nuclear power station (Suffolk)"]["stage"] == "Project underway"
     # an entry saved before these fields existed gets them filled in
     import json
@@ -200,6 +199,44 @@ def test_stage_where_and_link(tmp_path, monkeypatch, cfg):
     client = TestClient(create_app(cfg))
     page = client.get("/").text
     for col in ("<th>Stage</th>", "<th>Where</th>", "<th>Details</th>", "Read more ↗", "stage-expansion",
-                "Orrell Park, part of Fazakerley"):
+                "Orrell Park, Old Swan and part of Fazakerley"):
         assert col in page, col
     assert "Where:</b>" in client.get("/hotlist").text
+
+
+def test_hot_list_shows_only_whats_coming(tmp_path):
+    from datetime import date
+    db = DB(str(tmp_path / "x.sqlite3"))
+    hl = HotList(db)
+    up = hl.upcoming(today=date(2026, 11, 12))
+    keys = [e["key_date"] for e in up if e["category"] != "Major project"]
+    dated = [k for k in keys if k[:4].isdigit() and len(k) == 10]
+    assert dated == sorted(dated)                                       # soonest first
+    assert up[0]["title"].startswith("Bristol") and up[-1]["category"] == "Major project"
+    assert not any("Bury" in e["title"] for e in hl.all())              # already in force: not on the list
+    hl.save({"title": "Old thing", "category": "Article 4 coming", "stage": "Coming", "key_date": "2026-01-01"})
+    hl.save({"title": "Done", "category": "Article 4 in force", "stage": "In force", "key_date": "2027-01-01"})
+    titles = [e["title"] for e in hl.upcoming(today=date(2026, 11, 12))]
+    assert "Old thing" not in titles and "Done" not in titles           # past date / in force drop off
+    assert {"Old thing", "Done"} <= {e["title"] for e in hl.past(today=date(2026, 11, 12))}
+    # once Bristol's date passes it drops off by itself
+    assert not any(e["title"].startswith("Bristol") for e in hl.upcoming(today=date(2027, 1, 2)))
+
+
+def test_upgrade_from_version_2_replaces_old_entries(tmp_path):
+    db = DB(str(tmp_path / "x.sqlite3"))
+    db.conn.execute("CREATE TABLE IF NOT EXISTS hotlist (id TEXT PRIMARY KEY, data TEXT, updated TEXT)")
+    db.conn.execute("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)")
+    for i, (title, checked) in enumerate([("Bury: borough-wide HMO Article 4", "2026-11-11"),
+                                          ("Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)", "2026-11-11"),
+                                          ("Preston: HMO Article 4", "2026-11-20")]):        # last one edited by the user
+        e = {"id": f"x{i}", "title": title, "category": "Article 4 coming", "councils": [], "postcodes": [],
+             "status": "", "key_date": "", "summary": "", "impact": "", "sources": [], "checked": checked}
+        db.conn.execute("INSERT INTO hotlist VALUES (?,?,?)", (e["id"], __import__("json").dumps(e), "x"))
+    db.conn.execute("INSERT INTO meta VALUES ('hotlist_seed', '2')")
+    db.conn.commit()
+    titles = [e["title"] for e in HotList(db).all()]
+    assert "Bury: borough-wide HMO Article 4" not in titles
+    assert not any("since June 2021" in t for t in titles)
+    assert titles.count("Preston: HMO Article 4") == 1                    # the user's edited copy is kept, not duplicated
+    assert "Telford and Wrekin: HMO Article 4" in titles

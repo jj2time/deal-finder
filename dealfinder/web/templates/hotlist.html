@@ -29,8 +29,8 @@
   <div style="margin-top:12px; display:flex; gap:10px"><button>Save</button><a class="btn alt" href="/hotlist">Cancel</a></div>
 </form>
 {% endif %}
-{% for c in categories %}{% set group = entries|selectattr('category', 'equalto', c)|list %}{% if group %}
-<h3 style="margin:18px 4px 8px">{{ c }}</h3>
+{% for c in ['Coming up'] %}{% set group = entries %}{% if group %}
+<h3 style="margin:18px 4px 8px">Coming up, soonest first</h3>
 {% for e in group %}
 <div class="card" id="e-{{ e.id }}">
   <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap">
@@ -50,4 +50,10 @@
   <p class="muted small" style="margin:8px 0 0">Councils: {{ e.councils|join(', ') or '—' }} · Last checked {{ e.checked }}{% if e.sources %} · Sources: {% for src in e.sources %}<a href="{{ src.url }}" target="_blank" rel="noopener">{{ src.title }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}</p>
 </div>
 {% endfor %}{% endif %}{% endfor %}
+{% if past %}
+<details class="card"><summary class="muted">Already in force or past their date ({{ past|length }}) — kept for reference, not shown on the main page</summary>
+  <ul class="small">{% for e in past %}<li>{{ e.title }} — {{ e.key_date or e.status }}
+    <form method="post" action="/hotlist" style="display:inline" onsubmit="return confirm('Delete this entry?')"><input type="hidden" name="delete" value="{{ e.id }}"><button class="btn alt small">Delete</button></form></li>{% endfor %}</ul>
+</details>
+{% endif %}
 {% endblock %}

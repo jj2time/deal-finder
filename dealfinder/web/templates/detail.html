@@ -31,9 +31,11 @@
     {% if report.refurb_low and report.refurb_high %}<p><b>Refurb estimate: £{{ "{:,}".format(report.refurb_low) }}–£{{ "{:,}".format(report.refurb_high) }}</b>
       <a class="btn alt small" href="/deal/{{ l.key }}/post?refurb={{ ((report.refurb_low + report.refurb_high) / 2)|round|int }}">Use in deal post</a></p>{% endif %}
     <div class="report">{{ report.report }}</div>
+    {% if l.url %}<p style="margin-top:10px"><button type="button" class="btn alt small" onclick="analysePhotos('{{ l.url }}')">📷 Analyse again</button></p>{% endif %}
   {% elif l.url and 'rightmove.co.uk/properties/' in l.url %}
-    <p class="muted" style="margin-top:0">No report yet. In Claude Desktop (connected in <a href="/settings#claude">Settings</a>), paste:</p>
-    <p><code id="ask">Analyse the photos of {{ l.url }}</code> <button type="button" class="btn alt small" onclick="navigator.clipboard.writeText(document.getElementById('ask').innerText); this.innerText='Copied'">Copy</button></p>
+    <p class="muted" style="margin-top:0">No report yet.</p>
+    <p><button type="button" class="btn" onclick="analysePhotos('{{ l.url }}')">📷 Analyse photos</button>
+      <span class="muted small">Opens Claude Desktop with the instruction ready — just press Cmd+V and Enter.</span></p>
   {% else %}<p class="muted">Photo analysis works for Rightmove listings.</p>{% endif %}
 </div>
 
