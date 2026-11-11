@@ -155,6 +155,22 @@ like Sizewell C, regeneration. It starts with entries researched on 11 November 
 and the area scanner flags them. Upcoming changes come from council papers and news, so the list is kept by
 hand; always check with the council before relying on a date.
 
+## Ideas for later: selling it
+
+Agreed plan, parked for now (Nov 2026):
+
+- **Free light version in the browser** (Netlify, £0): area scanner, a single-property deal calculator and the
+  hot list, built only on Open Government Licence data (Land Registry, ONS, postcodes.io) and run entirely in
+  the visitor's browser (both services allow that), with data refreshed monthly by a GitHub job. "Upgrade"
+  button to the paid app.
+- **Paid downloadable app** with everything else, sold with licence keys via Lemon Squeezy, Gumroad or Stripe
+  (fee per sale, no monthly cost).
+- **Before selling:** take the free Rightmove reader and Apify scrapers out of the paid product (Rightmove's
+  terms and UK database rights), use only legal listing sources (auction CSVs, customers' own alert emails,
+  the Send to Deal Finder button, customers' own PropertyData keys); ICO registration, privacy policy and
+  terms; an Apple Developer account so customers don't see the "can't verify" warning; and an hour with a
+  solicitor on the data question.
+
 ## Not built yet
 
 - Repossessions are found from listing wording ("repossession", "mortgagee", "receivers") and auction
