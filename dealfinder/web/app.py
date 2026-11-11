@@ -26,6 +26,11 @@ from .dealpack import build_pdf
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["parse_qs"] = lambda q: __import__("urllib.parse", fromlist=["parse_qsl"]).parse_qsl(q)
 TEMPLATES.env.filters["money"] = lambda v: f"£{v:,.0f}" if isinstance(v, (int, float)) else "—"
+# Load every page layout into memory once, at startup. Replacing the app while it's running (installing an
+# update) then can't mix new layouts into the old running program.
+TEMPLATES.env.auto_reload = False
+for _name in TEMPLATES.env.list_templates():
+    TEMPLATES.env.get_template(_name)
 
 
 def _num(v, cast=float):
@@ -137,6 +142,39 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
 
     def ctx(request, **kw):
         return {"request": request, "year": date.today().year, "scan": scan_state, **kw}
+
+    from ..config import ROOT
+
+    def _version_file() -> str:
+        v = ROOT / "VERSION"
+        return v.read_text().strip() if v.exists() else "dev"
+
+    running_version = _version_file()
+
+    @app.exception_handler(Exception)
+    async def friendly_error(request: Request, exc: Exception):
+        import logging
+        import traceback
+        logging.getLogger("dealfinder").error("Page error on %s:\n%s", request.url.path,
+                                              "".join(traceback.format_exception(exc)))
+        updated = _version_file() != running_version
+        if updated:
+            what = ("Deal Finder was updated while it was running. <b>Open the Deal Finder app again</b> "
+                    "(from Applications) and it will restart with the new version.")
+        else:
+            what = ("Something went wrong showing this page. Try going back or reloading. If it keeps happening, "
+                    "send Claude a screenshot of this page.")
+        detail = f"{type(exc).__name__}: {exc}"[:400]
+        import html as _html
+        return HTMLResponse(
+            "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Deal Finder</title><body style='font:16px/1.5 -apple-system,sans-serif;max-width:640px;"
+            "margin:60px auto;padding:0 16px;color:#1d1d1b;background:#f7f7f5'>"
+            f"<h2>Deal Finder</h2><p>{what}</p>"
+            "<p><a href='/'>Back to the search page</a></p>"
+            f"<p style='color:#6b6b66;font-size:13px'>Details: {_html.escape(detail)}<br>Running version "
+            f"{_html.escape(running_version)}. The full error is in ~/Library/Application Support/Deal Finder/"
+            "dealfinder.log</p></body>", status_code=500)
 
     @app.get("/health")
     def health():

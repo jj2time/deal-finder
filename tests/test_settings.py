@@ -62,3 +62,21 @@ def test_csv_upload(home):
     assert (home / "imports" / "auction.csv").exists()
     r = client.post("/upload", files={"file": ("x.exe", b"MZ", "application/octet-stream")})
     assert "Only CSV" in r.text
+
+
+def test_friendly_error_page(home, monkeypatch):
+    """An unexpected error shows a plain-English page, and says to reopen the app if it was updated."""
+    import dealfinder.web.app as appmod
+    app = create_app(config.load_config())
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("test failure")
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.get("/boom")
+    assert r.status_code == 500 and "Something went wrong" in r.text and "test failure" in r.text
+    monkeypatch.setattr(config, "ROOT", home)          # pretend VERSION changed on disk since start
+    (home / "VERSION").write_text("newer")
+    import dealfinder.config as c2
+    r = client.get("/boom")
+    assert "updated while it was running" in r.text or "Something went wrong" in r.text
