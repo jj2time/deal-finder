@@ -2,8 +2,18 @@
 # Deal Finder for Mac. Double-click the app: first time it sets itself up (a few minutes),
 # then it starts in the background and opens the dashboard in your browser.
 set -u
-APP_DIR="$(cd "$(dirname "$0")/../Resources/app" && pwd)"
+BUNDLE_APP="$(cd "$(dirname "$0")/../Resources/app" && pwd)"
 SUPPORT="$HOME/Library/Application Support/Deal Finder"
+# Run an in-app update (Settings → Updates) if it's newer than the copy inside this app.
+APP_DIR="$BUNDLE_APP"
+if [ -f "$SUPPORT/app-current/VERSION" ] && [ -f "$SUPPORT/app-current/dealfinder/__init__.py" ]; then
+  bundle_time="$(cut -d- -f2 "$BUNDLE_APP/VERSION" 2>/dev/null)"
+  update_time="$(cut -d- -f2 "$SUPPORT/app-current/VERSION" 2>/dev/null)"
+  if [ -n "$update_time" ] && [[ "$update_time" > "$bundle_time" ]]; then
+    APP_DIR="$(cd "$SUPPORT/app-current" && pwd -P)"
+  fi
+fi
+export DEALFINDER_LAUNCHER="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 PORT=8765
 URL="http://127.0.0.1:$PORT"
 LOG="$SUPPORT/dealfinder.log"
@@ -11,6 +21,7 @@ mkdir -p "$SUPPORT"
 export DEALFINDER_HOME="$SUPPORT"
 export PYTHONDONTWRITEBYTECODE=1
 
+open_page() { [ "${DEALFINDER_NO_OPEN:-}" = "1" ] || open "$URL"; }
 notify() { osascript -e "display notification \"$1\" with title \"Deal Finder\"" >/dev/null 2>&1; }
 fail() {
   osascript -e "display dialog \"Deal Finder couldn't start: $1\n\nDetails are in:\n$LOG\" with title \"Deal Finder\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
@@ -39,7 +50,7 @@ stop_old() {
 }
 
 # Already running this version? Just open it. An older copy is stopped and replaced.
-if is_current; then open "$URL"; exit 0; fi
+if is_current; then open_page; exit 0; fi
 if port_in_use; then
   echo "=== Replacing running copy ($(curl -s -m 5 "$URL/health")) with $APP_VERSION $(date) ===" >>"$LOG"
   if ! stop_old; then
@@ -83,8 +94,8 @@ start_new() {
   done
   return 1
 }
-if start_new; then open "$URL"; exit 0; fi
+if start_new; then open_page; exit 0; fi
 # Something else answered (an old copy came back) or it didn't start: clear the port and try once more.
 port_in_use && stop_old
-if start_new; then open "$URL"; exit 0; fi
+if start_new; then open_page; exit 0; fi
 fail "it didn't start. Restart your Mac, then open Deal Finder again."

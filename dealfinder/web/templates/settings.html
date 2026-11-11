@@ -2,6 +2,7 @@
 {% block title %}Settings · Deal Finder{% endblock %}
 {% block header %}<span class="muted">Settings</span><span style="flex:1"></span><a class="btn alt" href="/">Back to deals</a>{% endblock %}
 {% block content %}
+{% if request.query_params.get('updated') %}<div class="card ok">✓ Deal Finder is updated and running the new version.</div>{% endif %}
 {% if saved %}<div class="card ok">Saved. Press <b>Scan now</b> on the deals page to use the new settings.</div>{% endif %}
 {% for e in errors %}<div class="card warn">{{ e }}</div>{% endfor %}
 <form method="post" action="/settings" autocomplete="off">
@@ -44,6 +45,32 @@
       <p class="muted small">Deal Finder sends <code>{"startUrls": [{"url": "…"}], "maxItems": 100}</code> plus anything above. Check the scraper's Input tab for the names it expects.</p>
     </details>
   </div>
+</div>
+
+<div class="card" id="updates"><h3>⬆️ Updates</h3>
+  <p class="muted small" style="margin-top:0">You're running version <b>{{ running_version.split('-')[0] }}</b>. Updates install from GitHub inside the app, so there's no download and no macOS security prompt.</p>
+  {% if not has_secret.GITHUB_TOKEN %}
+  <ol class="small">
+    <li>On GitHub, open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Settings → Developer settings → Fine-grained tokens → Generate new token</a>.</li>
+    <li>Name it “Deal Finder updates”. Under <b>Repository access</b> choose <b>Only select repositories</b> → <b>deal-finder</b>.</li>
+    <li>Under <b>Permissions → Repository permissions</b>, set <b>Contents</b> to <b>Read-only</b>. Leave everything else as it is.</li>
+    <li>Click <b>Generate token</b>, copy it, paste it below and press <b>Save settings</b>.</li>
+  </ol>
+  {% endif %}
+  <div class="form"><label>GitHub access key {% if has_secret.GITHUB_TOKEN %}<span class="ok-text">saved ✓ (leave blank to keep)</span>{% endif %}
+    <input type="password" name="env_GITHUB_TOKEN" placeholder="github_pat_…"></label></div>
+  {% if has_secret.GITHUB_TOKEN %}
+    {% if updates.error %}<p class="warntext small">{{ updates.error }}</p>{% endif %}
+    {% if updates.info and updates.info.available %}
+      <div class="card ok" style="margin:10px 0"><b>Update available: version {{ updates.info.latest.split('-')[0] }}</b> <span class="muted small">({{ updates.info.date }})</span>
+        <ul class="small" style="margin:6px 0">{% for c in updates.info.changes %}<li>{{ c }}</li>{% endfor %}</ul>
+        <button formaction="/updates/install" formmethod="post" formnovalidate>Update now</button>
+        <span class="muted small">Takes under a minute; the page reloads when it's done.</span></div>
+    {% elif updates.info %}
+      <p class="ok-text small">✓ You're up to date{% if updates.checked %} (checked {{ updates.checked }}){% endif %}.</p>
+    {% endif %}
+    <button class="btn alt" formaction="/updates/check" formmethod="post" formnovalidate>Check for updates</button>
+  {% endif %}
 </div>
 
 <div class="card" id="hot"><h3>🔥 Hot areas</h3>

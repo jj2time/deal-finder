@@ -61,6 +61,14 @@ something goes wrong).
 
 To rebuild the zip from this repo: `macos/build_app.sh` → `dist/DealFinder-mac.zip`.
 
+## Updates
+
+Settings → **Updates**: paste a read-only GitHub access key once (fine-grained token, repository
+`deal-finder`, Contents: Read-only). Deal Finder then checks GitHub when it starts and shows **⬆️ Update
+available**; **Update now** downloads the new version inside the app, restarts and reloads the page. Updates are
+kept in `~/Library/Application Support/Deal Finder/app-updates` (the newest two). Installing a newer zip by hand
+still works and takes over from an older downloaded update.
+
 ## Settings page
 
 **1. Free Rightmove reader** (on by default). Reads Rightmove's ordinary results pages for each search — up to

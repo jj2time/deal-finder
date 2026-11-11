@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Updating · Deal Finder{% endblock %}
+{% block content %}
+<div class="card progress" id="box"><div class="spinner"></div><div><b id="msg">Updating Deal Finder…</b><br><span class="muted" id="sub">Downloading the new version. Please keep this page open.</span></div></div>
+<script>
+  const before = {{ running_version|tojson }};
+  let restarting = false;
+  async function poll() {
+    try {
+      const h = await (await fetch('/health', {cache: 'no-store'})).json();
+      if (h.version && h.version !== before) {
+        document.getElementById('msg').textContent = 'Updated to version ' + h.version.split('-')[0] + '.';
+        document.getElementById('sub').textContent = 'Opening Deal Finder…';
+        setTimeout(() => location.href = '/settings?updated=1#updates', 800); return;
+      }
+      if (!restarting) {
+        const st = await (await fetch('/scan/status', {cache: 'no-store'})).json();
+        const err = (st.errors || {})['update'];
+        if (err) { document.getElementById('box').className = 'card warn'; document.getElementById('box').innerHTML = '<b>The update didn\'t finish:</b> ' + err.replace(/</g, '&lt;') + ' <a href="/settings#updates">Back to Settings</a>'; return; }
+        if (!st.running && st.last && st.last.installed) restarting = true;
+        if (st.progress) document.getElementById('sub').textContent = st.progress;
+      }
+    } catch (e) { restarting = true; document.getElementById('sub').textContent = 'Restarting Deal Finder…'; }
+    setTimeout(poll, 1500);
+  }
+  poll();
+  setTimeout(() => { if (restarting) document.getElementById('sub').innerHTML = 'Still restarting. If this takes more than a minute, open Deal Finder from Applications.'; }, 60000);
+</script>
+{% endblock %}

@@ -95,6 +95,7 @@
 <body>
 <header><h1><a href="/">Deal Finder</a></h1>
 <nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a></nav>
+{% if update_available is defined and update_available %}<a class="busy" style="background:#e5f4e4;color:var(--accent);text-decoration:none" href="/settings#updates">⬆️ Update available</a>{% endif %}
 {% if scan is defined and scan.running %}<span class="busy" title="{{ scan.progress }}"><span class="dot"></span> {{ scan.label }}{% if scan.queued %} (+{{ scan.queued|length }} waiting){% endif %}</span>{% endif %}
 {% block header %}{% endblock %}
 <form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? Daily scans pause until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>

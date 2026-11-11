@@ -141,7 +141,9 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                   "queued": [], "errors": {}}
 
     def ctx(request, **kw):
-        return {"request": request, "year": date.today().year, "scan": scan_state, **kw}
+        return {"request": request, "year": date.today().year, "scan": scan_state,
+                "update_available": bool((getattr(app.state, "updates", None) or {}).get("info", {}) and
+                                         app.state.updates["info"].get("available")), **kw}
 
     from ..config import ROOT
 
@@ -445,7 +447,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         has_secret = {k: bool(envv.get(k)) for k in SECRET_KEYS}
         from ..dealpost import HIGHLIGHTS
         return TEMPLATES.TemplateResponse(request, "settings.html", ctx(
-            request, cfg=cfg, post_highlights=HIGHLIGHTS,
+            request, cfg=cfg, post_highlights=HIGHLIGHTS, updates=update_state, running_version=running_version,
             hot_text="\n".join(f"{h['name']}, {h['area']}, {h['radius']:g}" for h in hot_areas(cfg)), mk=cfg.get("marketing") or {}, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
             types=PROPERTY_TYPES, saved=saved, errors=[e for e in errors.split("|") if e]))
 
@@ -470,6 +472,52 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         if errors:
             return RedirectResponse("/settings?errors=" + "|".join(errors), status_code=303)
         return RedirectResponse("/settings?saved=1", status_code=303)
+
+    # ---- in-app updates ----
+    update_state = {"info": None, "error": None, "checked": None}
+
+    def check_updates():
+        from ..updater import UpdateError, check
+        try:
+            update_state["info"] = check(state["cfg"].get("updates", {}).get("repo") or "jj2time/deal-finder")
+            update_state["error"] = None
+        except UpdateError as e:
+            update_state["error"] = str(e)
+        except Exception as e:
+            update_state["error"] = f"Couldn't check for updates: {e}"
+        from datetime import datetime
+        update_state["checked"] = datetime.now().strftime("%H:%M")
+
+    if env("GITHUB_TOKEN"):     # quietly look for an update when Deal Finder starts
+        threading.Thread(target=check_updates, daemon=True).start()
+    app.state.updates = update_state
+
+    @app.post("/updates/check")
+    def updates_check():
+        check_updates()
+        return RedirectResponse("/settings#updates", status_code=303)
+
+    @app.post("/updates/install")
+    def updates_install():
+        from ..updater import install, restart_into_new_version
+        info = update_state.get("info")
+        if not info or not info.get("available"):
+            return RedirectResponse("/settings#updates", status_code=303)
+
+        def work(sc):
+            sc.progress("Downloading the new version from GitHub…")
+            install(info, state["cfg"].get("updates", {}).get("repo") or "jj2time/deal-finder")
+            sc.progress("Installed. Restarting Deal Finder…")
+            update_state["installed"] = info["latest"]
+            update_state["restarting"] = restart_into_new_version()
+            return {"installed": info["latest"]}
+        start_job(work, "update", f"Updating Deal Finder to {info['latest'].split('-')[0]}")
+        return RedirectResponse("/updating", status_code=303)
+
+    @app.get("/updating", response_class=HTMLResponse)
+    def updating(request: Request):
+        return TEMPLATES.TemplateResponse(request, "updating.html", ctx(request, updates=update_state,
+                                                                       running_version=running_version))
 
     @app.post("/quit")
     def quit_app():
