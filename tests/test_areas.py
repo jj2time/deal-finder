@@ -90,7 +90,9 @@ def test_hotlist_seed_edit_and_lookup(tmp_path):
     assert len(hl.all()) == len(SEED)
     assert HotList(db) and len(hl.all()) == len(SEED)                    # seeding happens once
     liv = hl.for_councils({"Liverpool"})
-    assert liv and "Orrell Park" in liv[0]["summary"] and liv[0]["sources"]
+    assert len(liv) == 2 and {e["category"] for e in liv} == {"Article 4 in force", "Article 4 coming"}
+    assert any("17 June 2021" in e["status"] and "Wavertree" in e["summary"] for e in liv)
+    assert any("Orrell Park" in e["summary"] and "called in" in e["status"] for e in liv)
     assert hl.for_councils({"sefton"}) == []
     e = hl.save({"title": "Leeds: Headingley", "category": "Article 4 coming", "councils": "Leeds",
                  "postcodes": "ls6, ls4", "sources": "Leeds council | https://www.leeds.gov.uk/x\nnot a link"})
@@ -134,7 +136,7 @@ def test_pages(tmp_path, monkeypatch, cfg):
 
     report = client.get("/areas/E08000012", params={"type": "terraced"}).text
     assert "Why Liverpool (terraced)" in report and "not a forecast" in report
-    assert "Liverpool: HMO Article 4" in report and "Search within 3 miles of L3" in report
+    assert "Liverpool: HMO Article 4 in force since June 2021" in report and "Search within 3 miles of L3" in report
 
     home = client.get("/").text                                         # hot list is on the main page
     assert "🔥 Hot list" in home and "Sizewell C" in home and "Liverpool: HMO Article 4" in home
@@ -150,3 +152,22 @@ def test_pages(tmp_path, monkeypatch, cfg):
     assert "Heads-up for L15" in page and "Liverpool: HMO Article 4" in page
     page = client.get("/", params={"area": "BS5", "radius": 1}).text
     assert "Heads-up for BS5" in page and "Test regen" in page
+
+
+def test_old_liverpool_entry_replaced_on_upgrade(tmp_path):
+    import json
+    db = DB(str(tmp_path / "x.sqlite3"))
+    db.conn.execute("CREATE TABLE IF NOT EXISTS hotlist (id TEXT PRIMARY KEY, data TEXT, updated TEXT)")
+    db.conn.execute("CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)")
+    old = {"id": "old1", "title": "Liverpool: HMO Article 4 spreading across the city", "category": "Article 4 coming",
+           "councils": ["Liverpool"], "postcodes": [], "status": "", "key_date": "", "summary": "", "impact": "",
+           "sources": [], "checked": "2026-11-11"}
+    mine = {**old, "id": "mine", "title": "My own Leeds note", "checked": "2026-11-12"}
+    for e in (old, mine):
+        db.conn.execute("INSERT INTO hotlist VALUES (?,?,?)", (e["id"], json.dumps(e), "x"))
+    db.conn.execute("INSERT INTO meta VALUES ('hotlist_seed', '1')")
+    db.conn.commit()
+    titles = [e["title"] for e in HotList(db).all()]
+    assert "Liverpool: HMO Article 4 spreading across the city" not in titles
+    assert "My own Leeds note" in titles
+    assert sum(t.startswith("Liverpool: HMO Article 4") for t in titles) == 2

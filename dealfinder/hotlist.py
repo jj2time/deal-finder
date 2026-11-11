@@ -15,32 +15,56 @@ from typing import Any
 
 CATEGORIES = ["Article 4 coming", "Article 4 in force", "Major project", "Regeneration", "Other"]
 
-SEED_VERSION = 1
+SEED_VERSION = 2
+# Seed entries replaced in later versions (removed only if the person never edited them).
+REPLACED_SEEDS = {2: ["Liverpool: HMO Article 4 spreading across the city"]}
 SEED: list[dict[str, Any]] = [
     {
-        "title": "Liverpool: HMO Article 4 spreading across the city",
+        "title": "Liverpool: HMO Article 4 in force since June 2021 (11 wards incl. Wavertree)",
+        "category": "Article 4 in force",
+        "councils": ["Liverpool"],
+        "postcodes": ["L15", "L7", "L8", "L6"],
+        "status": "In force since 17 June 2021",
+        "key_date": "2021-06-17",
+        "summary": ("Turning a family home into a small HMO (3+ unrelated people) needs planning permission in 11 of "
+                    "Liverpool's former wards: Anfield, Central, Greenbank, Kensington and Fairfield, Picton, Princes "
+                    "Park, Riverside, Tuebrook and Stoneycroft, Wavertree, and parts of Church and Kirkdale. An earlier "
+                    "2018 direction covered the Dales area of Greenbank. Ward boundaries changed in 2023, so check the "
+                    "council's map for a specific street."),
+        "impact": ("New HMO conversions in these areas need planning permission. HMOs lawfully in use before "
+                   "17 June 2021 aren't affected, which makes existing licensed HMOs here scarcer and more valuable."),
+        "sources": [
+            {"title": "Liverpool City Council: planning permission for HMOs",
+             "url": "https://liverpool.gov.uk/planning-and-building-control/planning-permission/planning-permission-for-hmos/"},
+            {"title": "Liverpool Express: Liverpool to limit rise of HMO conversions",
+             "url": "https://liverpoolexpress.co.uk/liverpool-to-limit-rise-of-hmo-conversions/"},
+        ],
+        "checked": "2026-11-11",
+    },
+    {
+        "title": "Liverpool: HMO Article 4 expansion (Oct 2026) and citywide plan (2027)",
         "category": "Article 4 coming",
         "councils": ["Liverpool"],
-        "postcodes": ["L9 8BX", "L9 7AL", "L15", "L13", "L4", "L8"],
-        "status": "Expansion approved by cabinet; decision called in by opposition councillors; citywide controls planned",
-        "key_date": "October 2027 (reported target for the rest of the city)",
-        "summary": ("Cabinet approved new HMO Article 4 directions in more areas, reported to include Orrell Park, "
-                    "part of Fazakerley, Kirkdale, Everton, County, Walton, St Michaels and Sefton Park, some taking "
-                    "effect immediately. A whole-city direction is reported to be planned for around October 2027. "
-                    "The decision was called in, so details and timing may change. Reports differ on the details."),
-        "impact": ("Turning a house into a small HMO in the newly covered areas may already need planning "
-                   "permission; Wavertree and Old Swan may follow by late 2027. Existing lawful HMOs aren't "
-                   "affected, which can make them scarcer and more valuable. Check the council's map before "
-                   "buying for HMO use."),
+        "postcodes": ["L13", "L9 8BX", "L9 7AL", "L4", "L5"],
+        "status": "Cabinet approved 13 Oct 2026; called in for scrutiny 29 Oct 2026, so not settled",
+        "key_date": "Immediate areas now (if upheld); rest of the city about October 2027",
+        "summary": ("Cabinet approved immediate Article 4 controls in more areas: Kirkdale, Everton, County, Walton, "
+                    "Orrell Park and part of Fazakerley, part of Tuebrook Larkhill, Old Swan and part of Stoneycroft, "
+                    "Penny Lane, and parts of Calderstones and St Michaels and Sefton Park. A separate direction for the "
+                    "rest of the city is intended to start around October 2027. Opposition councillors called the "
+                    "decision in, so details and timing may change."),
+        "impact": ("If upheld, new small HMOs in Old Swan, Orrell Park and part of Fazakerley need planning "
+                   "permission now, and everywhere else in Liverpool from about late 2027. Check the council's "
+                   "decision record before buying for HMO use."),
         "sources": [
-            {"title": "Brit Brief: Liverpool expands HMO controls",
-             "url": "https://britbrief.co.uk/business/property/liverpool-expands-hmo-controls-to-five-more-areas.html"},
-            {"title": "Sustainable Construction Now: citywide HMO crackdown",
-             "url": "https://www.sustainableconstruction-now.com/article/552634/liverpool-plans-citywide-hmo-crackdown"},
+            {"title": "PlanningGeek: call-in delays new Article 4 controls",
+             "url": "https://www.planninggeek.co.uk/2026/liverpool-hmo-call-in/"},
+            {"title": "LandlordZone: Liverpool plans Article 4 expansion",
+             "url": "https://www.landlordzone.co.uk/news/liverpool-plans-article-4-expansion-to-curb-hmo-growth"},
             {"title": "Birkenhead News: decision called in",
              "url": "https://www.birkenhead.news/liverpool-hmo-decision-called-in/"},
-            {"title": "PlanningGeek: Liverpool HMO Article 4",
-             "url": "https://www.planninggeek.co.uk/2026/liverpool-hmo-article-4/"},
+            {"title": "Brit Brief: Liverpool expands HMO controls",
+             "url": "https://britbrief.co.uk/business/property/liverpool-expands-hmo-controls-to-five-more-areas.html"},
         ],
         "checked": "2026-11-11",
     },
@@ -210,6 +234,12 @@ class HotList:
         row = self.conn.execute("SELECT v FROM meta WHERE k='hotlist_seed'").fetchone()
         if row and int(row[0]) >= SEED_VERSION:
             return
+        done = int(row[0]) if row else 0
+        for v in range(done + 1, SEED_VERSION + 1):
+            for title in REPLACED_SEEDS.get(v, []):
+                for e in self.all():
+                    if e["title"] == title and e.get("checked") == "2026-11-11":
+                        self.delete(e["id"])
         existing = {e["title"] for e in self.all()}
         for d in SEED:
             if d["title"] not in existing:
