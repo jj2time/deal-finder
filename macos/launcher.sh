@@ -17,15 +17,38 @@ fail() {
   exit 1
 }
 
-# Already running? Open it — unless it's an older version, which is stopped and replaced.
 APP_VERSION="$(cat "$APP_DIR/VERSION" 2>/dev/null || echo unknown)"
-if RUNNING="$(curl -fs "$URL/health")"; then
-  case "$RUNNING" in
-    *"\"$APP_VERSION\""*) open "$URL"; exit 0 ;;
-  esac
-  echo "=== Replacing running version with $APP_VERSION $(date) ===" >>"$LOG"
-  curl -fs -X POST -o /dev/null "$URL/quit"
-  for _ in $(seq 1 20); do curl -fs -o /dev/null "$URL/health" || break; sleep 0.5; done
+is_current() { curl -fs -m 5 "$URL/health" 2>/dev/null | grep -q "\"$APP_VERSION\""; }
+port_in_use() { curl -s -m 3 -o /dev/null "$URL/health"; }
+
+stop_old() {
+  # 1. Ask the running copy to stop.
+  curl -s -m 5 -X POST -o /dev/null "$URL/quit"
+  for _ in $(seq 1 20); do port_in_use || return 0; sleep 0.5; done
+  # 2. Still there: stop Deal Finder's own process on this port (only Python processes running dealfinder).
+  echo "Old copy didn't stop when asked; stopping it." >>"$LOG"
+  for pid in $(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null); do
+    if ps -p "$pid" -o command= 2>/dev/null | grep -q "dealfinder"; then kill "$pid" 2>/dev/null; fi
+  done
+  for _ in $(seq 1 10); do port_in_use || return 0; sleep 0.5; done
+  for pid in $(lsof -ti "tcp:$PORT" -sTCP:LISTEN 2>/dev/null); do
+    if ps -p "$pid" -o command= 2>/dev/null | grep -q "dealfinder"; then kill -9 "$pid" 2>/dev/null; fi
+  done
+  for _ in $(seq 1 10); do port_in_use || return 0; sleep 0.5; done
+  return 1
+}
+
+# Already running this version? Just open it. An older copy is stopped and replaced.
+if is_current; then open "$URL"; exit 0; fi
+if port_in_use; then
+  echo "=== Replacing running copy ($(curl -s -m 5 "$URL/health")) with $APP_VERSION $(date) ===" >>"$LOG"
+  if ! stop_old; then
+    if curl -s -m 3 "$URL/health" | grep -q '"ok"'; then
+      fail "an older copy of Deal Finder is still running and won't stop. Restart your Mac, then open Deal Finder again."
+    else
+      fail "another program on your Mac is using Deal Finder's port ($PORT). Restart your Mac, then open Deal Finder again."
+    fi
+  fi
 fi
 
 VENV="$SUPPORT/venv"
@@ -51,10 +74,17 @@ if [ ! -f "$STAMP" ]; then
 fi
 
 cd "$APP_DIR" || fail "the app's files are missing."
-echo "=== Start $(date) ===" >>"$LOG"
-nohup "$VENV/bin/python" -m dealfinder run --port "$PORT" >>"$LOG" 2>&1 &
-for _ in $(seq 1 60); do
-  if curl -fs -o /dev/null "$URL/health"; then open "$URL"; exit 0; fi
-  sleep 0.5
-done
-fail "it didn't start in time."
+start_new() {
+  echo "=== Start $APP_VERSION $(date) ===" >>"$LOG"
+  nohup "$VENV/bin/python" -m dealfinder run --port "$PORT" >>"$LOG" 2>&1 &
+  for _ in $(seq 1 60); do
+    if is_current; then return 0; fi
+    sleep 0.5
+  done
+  return 1
+}
+if start_new; then open "$URL"; exit 0; fi
+# Something else answered (an old copy came back) or it didn't start: clear the port and try once more.
+port_in_use && stop_old
+if start_new; then open "$URL"; exit 0; fi
+fail "it didn't start. Restart your Mac, then open Deal Finder again."
