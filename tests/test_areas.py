@@ -112,7 +112,16 @@ def test_pages(tmp_path, monkeypatch, cfg):
     app = create_app(cfg)
     app.state.settings["postcodes"] = FakePostcodes()
     client = TestClient(app)
-    assert "Download area data" in client.get("/areas").text
+    started = []
+    import dealfinder.web.area_pages as ap
+    monkeypatch.setattr(ap, "update_area_data", lambda store, d, progress: started.append(1) or {})
+    page = client.get("/areas").text                                   # first visit starts the download itself
+    assert "Updating area data" in page
+    for _ in range(40):
+        if not client.get("/scan/status").json()["running"]:
+            break
+        import time; time.sleep(0.05)
+    assert started == [1]
     areas, meta = build(*make_files(tmp_path))
     AreaStore(DB(cfg["database"])).replace_all(areas, meta)
 
@@ -127,6 +136,9 @@ def test_pages(tmp_path, monkeypatch, cfg):
     assert "Why Liverpool (terraced)" in report and "not a forecast" in report
     assert "Liverpool: HMO Article 4" in report and "Search within 3 miles of L3" in report
 
+    home = client.get("/").text                                         # hot list is on the main page
+    assert "🔥 Hot list" in home and "Sizewell C" in home and "Liverpool: HMO Article 4" in home
+    assert 'href="/hotlist"' not in home.split("<main>")[0]              # no longer a menu tab
     hot = client.get("/hotlist").text
     assert "Sizewell C" in hot and "Liverpool area report" in hot and "Search L9 8BX" in hot
     r = client.post("/hotlist", data={"title": "Test regen", "category": "Regeneration", "councils": "Bristol, City of",

@@ -269,3 +269,40 @@ def test_searches_are_remembered_and_can_be_saved(tmp_path, monkeypatch, cfg, to
     link = home.split("Your searches")[1].split('<a href="')[1].split('"')[0].replace("&amp;", "&")
     assert "deal=BMV" in link and "max_price=150000" in link
     assert "3 propert" in client.get(link).text or "1 propert" in client.get(link).text
+
+
+def test_max_beds_exact_two_bed():
+    s = Search.from_params({"area": "L15", "min_beds": "2", "max_beds": "2"}.get, lambda k: [])
+    assert s.describe().endswith("2 bed") and "max_beds=2" in s.query_string()
+    q = parse_qs(urlparse(rightmove_url("OUTCODE^15", s)).query)
+    assert q["minBedrooms"] == ["2"] and q["maxBedrooms"] == ["2"]
+    assert parse_qs(urlparse(zoopla_url(s)).query)["beds_max"] == ["2"]
+    two = item({"price": 100000, "property_type": "terraced", "bedrooms": 2, "outcode": "L15"})
+    three = item({"price": 100000, "property_type": "terraced", "bedrooms": 3, "outcode": "L15"})
+    assert matches(two, s, None) and not matches(three, s, None)
+    assert Search(area="L15", min_beds=2, max_beds=2).fetch_key != Search(area="L15", min_beds=2).fetch_key
+
+
+def test_jobs_queue_instead_of_being_ignored(tmp_path, monkeypatch, cfg):
+    """A second job started while one is running must wait its turn, not be dropped."""
+    import threading
+    monkeypatch.setattr(config, "HOME", tmp_path)
+    app = create_app(cfg)
+    client = TestClient(app)
+    import dealfinder.pipeline as pipeline
+    monkeypatch.setattr(pipeline.Scanner, "__init__", lambda self, cfg, db=None, **kw: None)
+    gate, ran = threading.Event(), []
+    monkeypatch.setattr(pipeline.Scanner, "run", lambda self: (gate.wait(5), ran.append("scan"), {})[2])
+    import dealfinder.web.area_pages as ap
+    monkeypatch.setattr(ap, "update_area_data", lambda store, d, progress: ran.append("areas") or {})
+    client.post("/scan")                                                # a long job starts
+    client.post("/areas/update")                                        # requested while it's busy
+    st = client.get("/scan/status").json()
+    assert st["running"] and st["queued"] == ["Updating area data from the Land Registry and ONS"]
+    assert "Waiting for" in client.get("/areas").text and "+1 waiting" in client.get("/").text
+    gate.set()
+    for _ in range(60):
+        if not client.get("/scan/status").json()["running"]:
+            break
+        time.sleep(0.05)
+    assert ran == ["scan", "areas"]

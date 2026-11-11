@@ -21,7 +21,7 @@ def _num(v):
         return None
 
 
-def register(app, templates, ctx, state, db, start_job, postcodes):
+def register(app, templates, ctx, state, db, start_job, postcodes, scan_errors):
     store = AreaStore(db)
     hotlist = HotList(db)
     app.state.hotlist = hotlist
@@ -38,6 +38,8 @@ def register(app, templates, ctx, state, db, start_job, postcodes):
         region = qp.get("region") or ""
         max_price, min_yield = _num(qp.get("max_price")), _num(qp.get("min_yield"))
         q = (qp.get("q") or "").strip().lower()
+        if store.meta() is None and not scan_errors().get("areas"):
+            start_area_update()          # first visit: fetch the data straight away, no button needed
         areas = store.all()
         regions = sorted({a["region"] for a in areas if a["region"]})
         rows = []
@@ -57,11 +59,14 @@ def register(app, templates, ctx, state, db, start_job, postcodes):
             regions=regions, region=region, max_price=qp.get("max_price") or "", min_yield=qp.get("min_yield") or "",
             q=qp.get("q") or ""))
 
-    @app.post("/areas/update")
-    def area_update():
+    def start_area_update():
         data_dir = Path(state["cfg"]["database"]).parent / "area-data"
         start_job(lambda sc: update_area_data(store, data_dir, sc.progress), "areas",
                   "Updating area data from the Land Registry and ONS")
+
+    @app.post("/areas/update")
+    def area_update():
+        start_area_update()
         return RedirectResponse("/areas", status_code=303)
 
     @app.get("/areas/{code}", response_class=HTMLResponse)

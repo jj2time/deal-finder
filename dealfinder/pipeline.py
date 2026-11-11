@@ -58,6 +58,8 @@ def search_filter(s: Search) -> Callable[[Listing], bool]:
                 return False
         if s.min_beds and l.bedrooms is not None and l.bedrooms < s.min_beds:
             return False
+        if s.max_beds and l.bedrooms is not None and l.bedrooms > s.max_beds:
+            return False
         return l.property_type in s.types or l.property_type == "other"
     return keep
 

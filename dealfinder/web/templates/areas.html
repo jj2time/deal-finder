@@ -5,11 +5,11 @@
   <h2 style="margin:0 0 4px">Area scanner</h2>
   <p class="muted" style="margin:0 0 10px">Every council area in the UK ranked by yield and growth, from the official UK House Price Index (HM Land Registry) and ONS private rents.
   {% if meta %}Prices to {{ meta.price_month }}, rents to {{ meta.rent_month }}; {{ meta.areas }} areas.{% endif %}</p>
-  {% if scan.running and scan.query == 'areas' %}
-    <div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
+  {% if scan.running and (scan.query == 'areas' or 'Updating area data from the Land Registry and ONS' in scan.queued) %}
+    <div class="card progress"><div class="spinner"></div><div>{% if scan.query != 'areas' %}<b>Waiting for “{{ scan.label }}” to finish, then the area data downloads.</b>{% else %}<b>{{ scan.label }}</b>{% endif %}<br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
     <script>setInterval(async()=>{const st=await (await fetch('/scan/status')).json(); if(!st.running) location.reload(); else document.getElementById('progress').textContent=st.progress||'';},2500);</script>
   {% else %}
-    {% if scan.error and scan.query == 'areas' %}<div class="card warn"><b>The update didn't finish:</b> {{ scan.error }}</div>{% endif %}
+    {% if scan.errors.get('areas') %}<div class="card warn"><b>The update didn't finish:</b> {{ scan.errors.get('areas') }}</div>{% endif %}
     <form method="post" action="/areas/update" style="margin:0"><button class="{{ 'btn alt' if meta else '' }}">{{ 'Update area data' if meta else 'Download area data (about 55 MB, takes a minute)' }}</button>
       <span class="muted small">{{ 'New figures come out monthly.' if meta else 'Needed once; then update monthly.' }}</span></form>
   {% endif %}

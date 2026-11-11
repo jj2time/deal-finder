@@ -63,13 +63,18 @@
   .hot label.check { margin-right:2px; }
   .mainnav { display:flex; gap:4px; flex-wrap:wrap; } .mainnav a { color:var(--ink); text-decoration:none; padding:6px 10px; border-radius:6px; } .mainnav a:hover { background:var(--bg); }
   @media (max-width:700px) { header { flex-wrap:wrap; } }
+  .busy { font-size:12px; color:#1b4f80; background:#e7f1fb; border-radius:12px; padding:3px 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px; }
+  .busy .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#1b4f80; animation:spin 1s linear infinite alternate; }
+  table.hotlist td { vertical-align:top; } .nowrap { white-space:nowrap; }
+  details.card > summary { cursor:pointer; list-style-position:outside; }
   header nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   @media (max-width:700px) { main { padding:12px; } header { padding:12px; } }
 </style>
 </head>
 <body>
 <header><h1><a href="/">Deal Finder</a></h1>
-<nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a><a href="/hotlist">🔥 Hot list</a></nav>
+<nav class="mainnav"><a href="/">Search</a><a href="/areas">Area scanner</a></nav>
+{% if scan is defined and scan.running %}<span class="busy" title="{{ scan.progress }}"><span class="dot"></span> {{ scan.label }}{% if scan.queued %} (+{{ scan.queued|length }} waiting){% endif %}</span>{% endif %}
 {% block header %}{% endblock %}
 <form method="post" action="/quit" style="margin:0" onsubmit="return confirm('Stop Deal Finder? Daily scans pause until you open it again.')"><button class="btn alt" title="Stop Deal Finder running in the background">Stop</button></form></header>
 <main>{% block content %}{% endblock %}</main>

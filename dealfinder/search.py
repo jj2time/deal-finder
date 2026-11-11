@@ -51,6 +51,7 @@ class Search:
     min_price: int | None = None
     max_price: int | None = None
     min_beds: int | None = None
+    max_beds: int | None = None
     types: list[str] = field(default_factory=lambda: list(PROPERTY_TYPES))
     deals: list[str] = field(default_factory=list)   # ticked deal types; empty = all deals
     min_bmv: float | None = None
@@ -65,7 +66,7 @@ class Search:
             area=clean_area(get_one("area") or ""),
             radius_miles=next((r for r in RADII_MILES if r >= radius - 1e-9), RADII_MILES[-1]),
             min_price=_int(get_one("min_price")), max_price=_int(get_one("max_price")),
-            min_beds=_int(get_one("min_beds")),
+            min_beds=_int(get_one("min_beds")), max_beds=_int(get_one("max_beds")),
             types=types or list(PROPERTY_TYPES),
             deals=[d for d in get_list("deal") if d in STRATEGY_NAMES],
             min_bmv=_float(get_one("min_bmv")), min_yield=_float(get_one("min_yield")),
@@ -91,11 +92,11 @@ class Search:
     def fetch_key(self) -> str:
         """Searches that would fetch the same listings share a key."""
         return "|".join(str(x) for x in (self.area, self.radius_miles, self.min_price, self.max_price,
-                                         self.min_beds, ",".join(sorted(self.types))))
+                                         self.min_beds, self.max_beds, ",".join(sorted(self.types))))
 
     def query_string(self) -> str:
         pairs: list[tuple[str, Any]] = [("area", self.area), ("radius", self.radius_miles)]
-        for k in ("min_price", "max_price", "min_beds", "min_bmv", "min_yield"):
+        for k in ("min_price", "max_price", "min_beds", "max_beds", "min_bmv", "min_yield"):
             if getattr(self, k) is not None:
                 pairs.append((k, getattr(self, k)))
         pairs += [("type", t) for t in self.types] + [("deal", d) for d in self.deals]
@@ -111,8 +112,13 @@ class Search:
             bits.append(f"up to £{self.max_price:,}")
         elif self.min_price:
             bits.append(f"from £{self.min_price:,}")
-        if self.min_beds:
-            bits.append(f"{self.min_beds}+ beds")
+        lo, hi = self.min_beds, self.max_beds
+        if lo and hi:
+            bits.append(f"{lo} bed" if lo == hi else f"{lo}–{hi} beds")
+        elif lo:
+            bits.append(f"{lo}+ beds")
+        elif hi:
+            bits.append(f"up to {hi} beds")
         return ", ".join(bits)
 
 
@@ -145,6 +151,8 @@ def rightmove_url(location_id: str, s: Search) -> str:
         params.append(("maxPrice", s.max_price))
     if s.min_beds:
         params.append(("minBedrooms", s.min_beds))
+    if s.max_beds:
+        params.append(("maxBedrooms", s.max_beds))
     if set(s.types) != set(PROPERTY_TYPES):
         params.append(("propertyTypes", ",".join(RIGHTMOVE_TYPES[t] for t in s.types)))
     params += [("sortType", 6), ("includeSSTC", "false")]
@@ -159,6 +167,8 @@ def zoopla_url(s: Search) -> str:
         params.append(("price_max", s.max_price))
     if s.min_beds:
         params.append(("beds_min", s.min_beds))
+    if s.max_beds:
+        params.append(("beds_max", s.max_beds))
     return f"https://www.zoopla.co.uk/for-sale/property/{quote(s.outcode.lower())}/?" + urlencode(params)
 
 
@@ -179,6 +189,8 @@ def matches(item: dict, s: Search, centre: tuple[float, float] | None) -> bool:
         if s.max_price and price > s.max_price:
             return False
     if s.min_beds and l.get("bedrooms") is not None and l["bedrooms"] < s.min_beds:
+        return False
+    if s.max_beds and l.get("bedrooms") is not None and l["bedrooms"] > s.max_beds:
         return False
     if l.get("property_type") not in s.types and l.get("property_type") != "other":
         return False

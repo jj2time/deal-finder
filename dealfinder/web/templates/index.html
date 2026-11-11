@@ -7,7 +7,7 @@
 {% if msg %}<div class="card ok">{{ msg }}</div>{% endif %}
 {% if needs_setup %}<div class="card ok"><b>Welcome.</b> Turn on the free Rightmove reader (or add an Apify scraper) in <a href="/settings">Settings</a> before searching.</div>{% endif %}
 {% if batch %}<div class="card ok"><b>{{ batch_count }} listings from your browser.</b> Tick deal types below and press Search to filter them, or <a href="/">start a new search</a>.</div>{% endif %}
-{% if scan.error and not scan.running and (scan.query == query or scan.query == ('batch=' ~ batch) or not s.area) %}<div class="card warn"><b>The search didn't finish:</b> {{ scan.error }}</div>{% endif %}
+{% set err = scan.errors.get(query) or scan.errors.get('batch=' ~ batch) %}{% if err and not (scan.running and scan.query == query) %}<div class="card warn"><b>The search didn't finish:</b> {{ err }}</div>{% endif %}
 
 <form class="card" method="{{ 'get' if batch else 'post' }}" action="{{ '/' if batch else '/search' }}" id="search">
   {% if batch %}<input type="hidden" name="batch" value="{{ batch }}">{% endif %}
@@ -19,7 +19,9 @@
     <label>Min price £<input name="min_price" value="{{ s.min_price or '' }}" size="8" inputmode="numeric"></label>
     <label>Max price £<input name="max_price" value="{{ s.max_price or '' }}" size="8" inputmode="numeric"></label>
     <label>Min beds
-      <select name="min_beds"><option value="">Any</option>{% for b in range(1,7) %}<option value="{{ b }}" {% if s.min_beds == b %}selected{% endif %}>{{ b }}+</option>{% endfor %}</select></label>
+      <select name="min_beds"><option value="">Any</option>{% for b in range(1,7) %}<option value="{{ b }}" {% if s.min_beds == b %}selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
+    <label>Max beds
+      <select name="max_beds"><option value="">Any</option>{% for b in range(1,7) %}<option value="{{ b }}" {% if s.max_beds == b %}selected{% endif %}>{{ b }}</option>{% endfor %}</select></label>
     <button class="big">Search</button>
   </div>
 
@@ -61,7 +63,7 @@
 </form>
 
 {% if scan.running %}
-<div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span></div></div>
+<div class="card progress"><div class="spinner"></div><div><b>{{ scan.label }}</b><br><span class="muted" id="progress">{{ scan.progress }}</span>{% if scan.queued %}<br><span class="small">Next: {{ scan.queued|join(' · ') }}</span>{% endif %}</div></div>
 {% endif %}
 
 {% if batch and items %}
@@ -117,6 +119,22 @@
 {% elif searches and fetched|selectattr(1)|list and not scan.running %}
 <div class="card muted">No properties match. Try a bigger radius, fewer deal types, or a wider price range.</div>
 {% endif %}
+
+<details class="card" id="hotlist" open>
+  <summary><h3 style="display:inline">🔥 Hot list</h3> <span class="muted small">— areas with something going on ({{ hotlist_entries|length }})</span></summary>
+  <p class="muted small" style="margin:6px 0 10px">Article 4 restrictions coming in, big projects, regeneration. Searches in these councils show a heads-up. Dates change — check with the council.
+    <a href="/hotlist?new=1#form">Add an entry</a> · <a href="/hotlist">Full details and editing</a></p>
+  <table class="hotlist">
+  {% for e in hotlist_entries %}
+    <tr>
+      <td><span class="tag {{ 'on' if 'Article 4' in e.category else '' }}">{{ e.category }}</span></td>
+      <td><a href="/hotlist#e-{{ e.id }}"><b>{{ e.title }}</b></a><br><span class="muted small">{{ e.status }}</span></td>
+      <td class="small nowrap">{{ e.key_date }}</td>
+      <td class="num">{% for pc in e.postcodes[:3] %}<form method="post" action="/search" style="display:inline"><input type="hidden" name="area" value="{{ pc }}"><input type="hidden" name="radius" value="{{ '0.5' if ' ' in pc else '1' }}">{% for k in ['detached','semi-detached','terraced','flat','other'] %}<input type="hidden" name="type" value="{{ k }}">{% endfor %}<button class="btn alt small">{{ pc }}</button></form> {% endfor %}</td>
+    </tr>
+  {% else %}<tr><td class="muted">Nothing yet. <a href="/hotlist?new=1#form">Add an area</a>.</td></tr>{% endfor %}
+  </table>
+</details>
 
 <div class="card">
   <h3>Send listings from Rightmove yourself</h3>

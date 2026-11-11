@@ -131,7 +131,9 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     app = FastAPI(title="Deal Finder")
     imports: dict[str, set[str]] = {}
     job_lock = threading.Lock()
-    scan_state = {"running": False, "last": None, "error": None, "query": None, "label": "", "progress": ""}
+    job_queue: list = []
+    scan_state = {"running": False, "last": None, "error": None, "query": None, "label": "", "progress": "",
+                  "queued": [], "errors": {}}
 
     def ctx(request, **kw):
         return {"request": request, "year": date.today().year, "scan": scan_state, **kw}
@@ -211,6 +213,7 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
             searching=scan_state["running"] and scan_state.get("query") == page_query(s, names),
             hot=hot, hot_ticked=names, searches=searches, fetched=fetched, heads_up=heads_up,
+            hotlist_entries=app.state.hotlist.all(),
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
             recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
                      "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
@@ -333,30 +336,44 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
                                  headers={"Content-Disposition": 'attachment; filename="deals.csv"'})
 
     def start_job(work, query: str = "", label: str = "Scanning"):
+        """Runs a job in the background. If one is already running, this one waits its turn (never dropped)."""
         with job_lock:
             if scan_state["running"]:
-                return False
+                if scan_state.get("query") != query and all(q != query for _, q, _ in job_queue):
+                    job_queue.append((work, query, label))
+                scan_state["queued"] = [lbl for _, _, lbl in job_queue]
+                return True
             # Marked as running before the page reloads, so the page always shows the progress box.
             scan_state.update(running=True, error=None, last=None, query=query, label=label,
-                              progress=label + "…")
+                              progress=label + "…", queued=[])
+            scan_state["errors"].pop(query, None)
 
-        def run():
+        def run(work, query):
             from ..pipeline import Scanner, SearchError
-            try:
-                scanner = Scanner(state["cfg"], db=db)
-                scanner.progress = lambda m: scan_state.__setitem__("progress", m)
-                scan_state["last"] = work(scanner)
-            except SearchError as e:
-                scan_state["error"] = str(e)
-            except Exception as e:  # shown on the page
-                scan_state["error"] = f"Something went wrong: {e}"
-            finally:
-                scan_state["running"] = False
-        threading.Thread(target=run, daemon=True).start()
+            while True:
+                try:
+                    scanner = Scanner(state["cfg"], db=db)
+                    scanner.progress = lambda m: scan_state.__setitem__("progress", m)
+                    scan_state["last"] = work(scanner)
+                except SearchError as e:
+                    scan_state["error"] = scan_state["errors"][query] = str(e)
+                except Exception as e:  # shown on the page
+                    scan_state["error"] = scan_state["errors"][query] = f"Something went wrong: {e}"
+                with job_lock:
+                    if not job_queue:
+                        scan_state["running"] = False
+                        scan_state["queued"] = []
+                        return
+                    work, query, label = job_queue.pop(0)
+                    scan_state.update(error=None, query=query, label=label, progress=label + "…",
+                                      queued=[lbl for _, _, lbl in job_queue])
+                    scan_state["errors"].pop(query, None)
+        threading.Thread(target=run, args=(work, query), daemon=True).start()
         return True
 
     from .area_pages import register as register_area_pages
-    hot_for_council = register_area_pages(app, TEMPLATES, ctx, state, db, start_job, postcodes)
+    hot_for_council = register_area_pages(app, TEMPLATES, ctx, state, db, start_job, postcodes,
+                                          lambda: scan_state["errors"])
 
     @app.post("/scan")
     def scan():
