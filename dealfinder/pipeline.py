@@ -215,6 +215,32 @@ class Scanner:
         self.db.mark_fetched(s.fetch_key, s.to_dict(), stats["fetched"])
         return stats
 
+    def run_searches(self, searches: list[Search], refresh: bool = False) -> dict:
+        """Several area searches in one go; one failing area doesn't stop the others."""
+        total = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0, "errors": []}
+        done = 0
+        for i, s in enumerate(searches, 1):
+            if not refresh and not self.needs_fetch(s):
+                done += 1
+                continue
+            if len(searches) > 1:
+                outer = self.progress
+                self.progress = lambda m, outer=outer, s=s, i=i: outer(f"{s.area} ({i} of {len(searches)}): {m}")
+            try:
+                stats = self.run_search(s)
+                done += 1
+                for k in ("fetched", "kept", "new", "alerts"):
+                    total[k] += stats.get(k, 0)
+                total["errors"] += stats.get("errors", [])
+            except SearchError as e:
+                total["errors"].append(f"{s.area}: {e}")
+            finally:
+                if len(searches) > 1:
+                    self.progress = outer
+        if not done and total["errors"]:
+            raise SearchError(" ".join(total["errors"]))
+        return total
+
     # ---- daily scan ----
     def run(self) -> dict:
         total = {"fetched": 0, "kept": 0, "new": 0, "alerts": 0}

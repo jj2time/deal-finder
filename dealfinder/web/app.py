@@ -19,7 +19,8 @@ from ..config import ENV_KEYS, SECRET_KEYS, env, home_path, load_config, read_en
 from ..db import DB
 from ..analysis.strategies import STRATEGIES
 from ..models import PROPERTY_TYPES
-from ..search import RADII_MILES, SORTS, Search, matches
+from ..search import (RADII_MILES, SORTS, Search, area_searches, hot_areas, matches, page_query,
+                      parse_hot_areas)
 from .dealpack import build_pdf
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -89,6 +90,11 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
             th[key] = v
     cfg.setdefault("stamp_duty", {})["buyer_is_non_resident"] = bool(form.get("non_resident"))
 
+    if "hot_areas_text" in form:
+        areas, errs = parse_hot_areas(form.get("hot_areas_text", ""))
+        cfg["hot_areas"] = areas
+        errors += errs
+
     mk = cfg.setdefault("marketing", {})
     mk["contact"] = form.get("marketing_contact", "").strip()
     mk["sourcing_fee"] = _num(form.get("marketing_sourcing_fee"), int) or 0
@@ -156,8 +162,12 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
             shown = [it for it in items if it["listing"]["key"] in batch_keys and
                      (not s.deals or {m["name"] for m in it["analysis"]["strategies"]} & set(s.deals))]
         else:
+            hot = hot_areas(state["cfg"])
+            names = [n for n in request.query_params.getlist("hot") if n]
+            searches = area_searches(s, hot, names)
             centre = locate(s)
-            shown = [it for it in items if matches(it, s, centre)] if s.area else []
+            located = [(x, locate(x)) for x in searches]
+            shown = [it for it in items if any(matches(it, x, c) for x, c in located)]
         shown.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
         counts = {name: sum(1 for it in shown if name in {m["name"] for m in it["analysis"]["strategies"]})
                   for name in STRATEGIES}
@@ -168,32 +178,49 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         acfg = srcs.get("apify") or {}
         free_on = (srcs.get("rightmove") or {}).get("enabled", True)
         needs_setup = not free_on and not (env("APIFY_TOKEN") and (acfg.get("rightmove_actor_id") or acfg.get("zoopla_actor_id")))
+        hot = hot_areas(state["cfg"])
+        names = [n for n in request.query_params.getlist("hot") if n]
+        searches = area_searches(s, hot, names) if batch_keys is None else []
         last = db.last_fetched(s.fetch_key) if s.area else None
+        fetched = [(x.area, db.last_fetched(x.fetch_key)) for x in searches]
         return TEMPLATES.TemplateResponse(request, "index.html", ctx(
             request, s=s, items=shown, total=len(items), strategies=STRATEGIES, counts=counts,
             radii=RADII_MILES, sorts={k: v[0] for k, v in SORTS.items()}, types=PROPERTY_TYPES,
             points=points, msg=msg, needs_setup=needs_setup, last_fetched=last,
-            searching=scan_state["running"] and scan_state.get("query") == s.query_string(),
+            searching=scan_state["running"] and scan_state.get("query") == page_query(s, names),
+            hot=hot, hot_ticked=names, searches=searches, fetched=fetched,
             saved=db.is_saved(s.fetch_key) if s.area else False, saved_searches=db.saved_searches(),
             recent=[{"q": Search.from_dict(d).query_string(), "label": Search.from_dict(d).describe(),
                      "deals": d.get("deals") or [], "saved": d["_saved"], "when": d["_last_fetched"],
                      "count": d["_count"], "form": Search.from_dict(d).query_string()}
                     for d in db.recent_searches()],
-            query=s.query_string(), batch=batch if batch_keys is not None else "",
+            query=page_query(s, names), batch=batch if batch_keys is not None else "",
             batch_count=len(batch_keys or []), bookmarklet=bookmarklet(str(request.base_url).rstrip("/"))))
 
     @app.post("/search")
     async def run_search(request: Request):
         form = await request.form()
-        s = Search.from_params(form.get, form.getlist)
-        q = s.query_string()
-        if not s.area:
-            return RedirectResponse("/?msg=Type+a+postcode+first.", status_code=303)
+        base = Search.from_params(form.get, form.getlist)
+        hot = hot_areas(state["cfg"])
+        only = form.get("only")
+        if only:   # a one-click hot-area button: just that area
+            from dataclasses import replace
+            base = replace(base, area="")
+            names = [only]
+        else:
+            names = [n for n in form.getlist("hot") if n]
+        searches = area_searches(base, hot, names)
+        q = page_query(base, names)
+        if not searches:
+            return RedirectResponse("/?msg=Type+a+postcode+or+tick+a+hot+area+first.", status_code=303)
         from ..pipeline import Scanner
+        refresh = bool(form.get("refresh"))
         scanner = Scanner(state["cfg"], db=db)
-        if not form.get("refresh") and not scanner.needs_fetch(s):
+        if not refresh and not any(scanner.needs_fetch(x) for x in searches):
             return RedirectResponse(f"/?{q}", status_code=303)
-        start_job(lambda sc: sc.run_search(s), q, f"Searching {s.describe()}")
+        label = ("Searching " + searches[0].describe() if len(searches) == 1 else
+                 f"Searching {len(searches)} areas: " + ", ".join(x.area for x in searches))
+        start_job(lambda sc: sc.run_searches(searches, refresh), q, label)
         return RedirectResponse(f"/?{q}", status_code=303)
 
     @app.get("/import/browser", response_class=HTMLResponse)
@@ -264,7 +291,10 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     @app.get("/export.csv")
     def export(request: Request):
         s = current_search(request)
-        items = [it for it in db.results() if matches(it, s, locate(s))] if s.area else db.results()
+        names = [n for n in request.query_params.getlist("hot") if n]
+        searches = area_searches(s, hot_areas(state["cfg"]), names)
+        located = [(x, locate(x)) for x in searches]
+        items = [it for it in db.results() if any(matches(it, x, c) for x, c in located)] if searches else db.results()
         items.sort(key=SORTS.get(s.sort, SORTS["score"])[1])
         buf = io.StringIO()
         w = csv.writer(buf)
@@ -330,7 +360,8 @@ def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
         has_secret = {k: bool(envv.get(k)) for k in SECRET_KEYS}
         from ..dealpost import HIGHLIGHTS
         return TEMPLATES.TemplateResponse(request, "settings.html", ctx(
-            request, cfg=cfg, post_highlights=HIGHLIGHTS, mk=cfg.get("marketing") or {}, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
+            request, cfg=cfg, post_highlights=HIGHLIGHTS,
+            hot_text="\n".join(f"{h['name']}, {h['area']}, {h['radius']:g}" for h in hot_areas(cfg)), mk=cfg.get("marketing") or {}, keys=keys, has_secret=has_secret, apify=_apify_form(cfg),
             types=PROPERTY_TYPES, saved=saved, errors=[e for e in errors.split("|") if e]))
 
     @app.post("/settings")

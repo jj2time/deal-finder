@@ -13,6 +13,10 @@ area (free, built in — or through a paid Apify scraper if you add one), values
 sold prices nearby, and shows the ones that match your ticks, best first. A search takes about a minute; changing
 the ticks afterwards, or repeating the search within 12 hours, is instant.
 
+**Hot areas.** Areas you watch (Wavertree L15 and Old Swan L13 to start) appear as tick boxes and one-click
+**Search →** buttons above the filters. Tick several and press Search to check them all at once with the same
+price, bedroom and deal-type filters. Edit the list in Settings → Hot areas (one per line: name, postcode, radius).
+
 **Send to Deal Finder button.** Drag the button on the search page to your bookmarks bar. While you browse
 Rightmove yourself, click it on any results page and every listing on that page is analysed in Deal Finder.
 **Save search** re-runs it every day and emails you new high-scoring deals.
@@ -129,6 +133,12 @@ Tests cover stamp duty, finance, valuation, strategy flags, every source's parsi
 APIs, the dashboard, CSV export and the PDF. The live Land Registry, postcodes.io, PropertyData and Apify calls
 haven't been run against the real services yet — the first real scan is the test of those. The Mac app's
 launcher was tested in a simulation, not on a real Mac.
+
+## Next up (requested)
+
+- **National area scanner:** rank every postcode district in England and Wales using free government data
+  (HM Land Registry sold prices, ONS rents) by price, yield, growth and sales volume, so searches can be
+  pointed at the best areas without reading more of Rightmove.
 
 ## Not built yet
 

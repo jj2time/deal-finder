@@ -200,3 +200,58 @@ SORTS = {
     "newest": ("Newest first", lambda it: "~" if not it.get("first_seen") else
                "".join(chr(255 - ord(c)) for c in it["first_seen"])),
 }
+
+
+# ---- hot areas ----------------------------------------------------------------------------------
+
+def snap_radius(radius) -> float:
+    r = _float(radius) or 1
+    return next((x for x in RADII_MILES if x >= r - 1e-9), RADII_MILES[-1])
+
+
+DEFAULT_HOT_AREAS = [{"name": "Wavertree", "area": "L15", "radius": 1},
+                     {"name": "Old Swan", "area": "L13", "radius": 1}]
+
+
+def hot_areas(cfg: dict) -> list[dict]:
+    out = []
+    configured = cfg.get("hot_areas")
+    for h in DEFAULT_HOT_AREAS if configured is None else configured:
+        if isinstance(h, dict) and h.get("name") and h.get("area"):
+            out.append({"name": str(h["name"]).strip(), "area": clean_area(str(h["area"])),
+                        "radius": snap_radius(h.get("radius", 1))})
+    return out
+
+
+def parse_hot_areas(text: str) -> tuple[list[dict], list[str]]:
+    """'Wavertree, L15, 1' per line -> hot areas (+ errors)."""
+    areas, errors = [], []
+    for line in (text or "").splitlines():
+        if not line.strip():
+            continue
+        bits = [b.strip() for b in line.split(",")]
+        if len(bits) < 2 or not bits[0] or not bits[1]:
+            errors.append(f"Hot area line “{line.strip()}” needs a name and a postcode, e.g. Wavertree, L15, 1")
+            continue
+        areas.append({"name": bits[0], "area": clean_area(bits[1]),
+                      "radius": snap_radius(bits[2] if len(bits) > 2 else 1)})
+    return areas, errors
+
+
+def area_searches(base: Search, hot: list[dict], names: list[str]) -> list[Search]:
+    """The typed area (if any) plus each ticked hot area, all with the same filters and ticks."""
+    from dataclasses import replace
+    out = [base] if base.area else []
+    by_name = {h["name"]: h for h in hot}
+    for n in names:
+        h = by_name.get(n)
+        if h:
+            s = replace(base, area=h["area"], radius_miles=h["radius"])
+            if all(x.fetch_key != s.fetch_key for x in out):
+                out.append(s)
+    return out
+
+
+def page_query(base: Search, names: list[str]) -> str:
+    q = base.query_string()
+    return q + "".join("&" + urlencode([("hot", n)]) for n in names)

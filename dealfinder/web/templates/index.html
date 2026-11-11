@@ -13,7 +13,7 @@
   {% if batch %}<input type="hidden" name="batch" value="{{ batch }}">{% endif %}
   <div class="searchbar">
     <label class="grow">Postcode or district
-      <input name="area" value="{{ s.area }}" placeholder="e.g. BS5 6HN or M14" autofocus {% if not batch %}required{% endif %}></label>
+      <input name="area" value="{{ s.area }}" placeholder="e.g. BS5 6HN or M14 — or tick hot areas below" autofocus></label>
     <label>Radius
       <select name="radius">{% for r in radii %}<option value="{{ r }}" {% if r == s.radius_miles %}selected{% endif %}>{{ r|string|replace('.0','') }} mile{% if r != 1 %}s{% endif %}</option>{% endfor %}</select></label>
     <label>Min price £<input name="min_price" value="{{ s.min_price or '' }}" size="8" inputmode="numeric"></label>
@@ -22,6 +22,19 @@
       <select name="min_beds"><option value="">Any</option>{% for b in range(1,7) %}<option value="{{ b }}" {% if s.min_beds == b %}selected{% endif %}>{{ b }}+</option>{% endfor %}</select></label>
     <button class="big">Search</button>
   </div>
+
+  {% if hot and not batch %}
+  <div class="hotareas">
+    <span class="hotlabel">🔥 Hot areas</span>
+    {% for h in hot %}
+      <span class="hot">
+        <label class="check" title="Tick to include in the search"><input type="checkbox" name="hot" value="{{ h.name }}" {% if h.name in hot_ticked %}checked{% endif %}> {{ h.name }} <span class="muted small">{{ h.area }}</span></label>
+        <button class="btn alt small" name="only" value="{{ h.name }}" formnovalidate title="Search just {{ h.name }} now">Search →</button>
+      </span>
+    {% endfor %}
+    <a class="small" href="/settings#hot">edit</a>
+  </div>
+  {% endif %}
 
   <div class="row">
     <span class="muted">Property type:</span>
@@ -54,23 +67,26 @@
 {% if batch and items %}
 <div class="card resultsbar"><b>{{ items|length }} of {{ batch_count }} sent from your browser{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}</b></div>
 {% endif %}
-{% if s.area and not batch %}
+{% if searches and not batch %}
 <div class="card resultsbar">
-  <div><b>{{ items|length }} propert{{ 'y' if items|length == 1 else 'ies' }}</b> {{ s.describe() }}{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}
-    <br><span class="muted small">{% if last_fetched %}Listings last fetched {{ last_fetched[:16]|replace('T',' ') }} UTC.{% elif not searching %}Not fetched yet — press Search.{% endif %}</span></div>
+  <div><b>{{ items|length }} propert{{ 'y' if items|length == 1 else 'ies' }}</b>
+    {% if searches|length == 1 %}{{ searches[0].describe() }}{% else %}in {% for x in searches %}{% set hn = (hot|selectattr('area','equalto',x.area)|map(attribute='name')|first) %}{{ hn ~ ' (' ~ x.area ~ ')' if hn else x.area }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}{% if s.deals %} matching {{ s.deals|join(', ') }}{% endif %}
+    <br><span class="muted small">{% for a, when in fetched %}{{ a }}: {% if when %}fetched {{ when[:16]|replace('T',' ') }} UTC{% else %}not fetched yet{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</span></div>
   <span style="flex:1"></span>
+  {% if searches|length == 1 %}
   <form method="post" action="/search/save" style="margin:0">
     {% for k, v in request.query_params.multi_items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
     {% if saved %}<input type="hidden" name="saved" value="0"><button class="btn alt" title="Stop scanning this search every day">★ Saved — scans daily</button>
     {% else %}<input type="hidden" name="saved" value="1"><button class="btn alt" title="Re-run this search every day and email me new deals">☆ Save search (scan daily)</button>{% endif %}
   </form>
+  {% endif %}
   <a class="btn alt" href="/export.csv?{{ query }}">Export CSV</a>
 </div>
 {% endif %}
 
 {% if points %}<div class="card" id="mapcard"><div id="map"></div></div>{% endif %}
 
-{% if (s.area or batch) and items %}
+{% if (searches or batch) and items %}
 <div class="card scroll">
 <table>
   <thead><tr><th>Score</th><th>Property</th><th class="num">Asking</th><th class="num">Area value</th><th class="num">BMV</th>
@@ -94,7 +110,7 @@
   </tbody>
 </table>
 </div>
-{% elif s.area and last_fetched and not scan.running %}
+{% elif searches and fetched|selectattr(1)|list and not scan.running %}
 <div class="card muted">No properties match. Try a bigger radius, fewer deal types, or a wider price range.</div>
 {% endif %}
 

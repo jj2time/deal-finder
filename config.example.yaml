@@ -37,6 +37,12 @@ sources:
     enabled: true
     folder: imports          # drop auction catalogues / any CSV here; see README for columns
 
+# Areas you watch, shown as tick boxes and one-click buttons on the search page.
+# area = a postcode district (e.g. L15) or a full postcode; radius in miles.
+hot_areas:
+  - {name: Wavertree, area: L15, radius: 1}
+  - {name: Old Swan, area: L13, radius: 1}
+
 valuation:
   months_back: 24
   radii_m: [400, 800, 1200, 2000]
