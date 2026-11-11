@@ -91,8 +91,10 @@ def apply_settings(cfg: dict, form: dict) -> list[str]:
     cfg.setdefault("stamp_duty", {})["buyer_is_non_resident"] = bool(form.get("non_resident"))
 
     if "hot_areas_text" in form:
+        from ..search import HOT_AREAS_VERSION
         areas, errs = parse_hot_areas(form.get("hot_areas_text", ""))
         cfg["hot_areas"] = areas
+        cfg["hot_areas_version"] = HOT_AREAS_VERSION
         errors += errs
 
     mk = cfg.setdefault("marketing", {})
@@ -122,6 +124,9 @@ def bookmarklet(base_url: str) -> str:
 
 def create_app(cfg: dict | None = None, on_quit=None) -> FastAPI:
     state = {"cfg": cfg or load_config()}
+    from ..search import upgrade_hot_areas
+    if upgrade_hot_areas(state["cfg"]):
+        save_config(state["cfg"])
     db = DB(state["cfg"]["database"])
     app = FastAPI(title="Deal Finder")
     imports: dict[str, set[str]] = {}

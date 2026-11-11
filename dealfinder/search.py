@@ -210,7 +210,24 @@ def snap_radius(radius) -> float:
 
 
 DEFAULT_HOT_AREAS = [{"name": "Wavertree", "area": "L15", "radius": 1},
-                     {"name": "Old Swan", "area": "L13", "radius": 1}]
+                     {"name": "Old Swan", "area": "L13", "radius": 1},
+                     {"name": "Aintree Hospital / Longmoor Lane", "area": "L9 7AL", "radius": 0.5},
+                     {"name": "Orrell Park", "area": "L9 8BX", "radius": 0.5}]
+HOT_AREAS_VERSION = 2   # bump when adding defaults; existing lists get the new ones added once
+ADDED_IN_VERSION = {2: ["Aintree Hospital / Longmoor Lane", "Orrell Park"]}
+
+
+def upgrade_hot_areas(cfg: dict) -> bool:
+    """Adds newly introduced default hot areas to a list the person already saved. True if changed."""
+    if cfg.get("hot_areas") is None or cfg.get("hot_areas_version", 1) >= HOT_AREAS_VERSION:
+        return False
+    names = {str(h.get("name")) for h in cfg["hot_areas"] if isinstance(h, dict)}
+    for v in range(cfg.get("hot_areas_version", 1) + 1, HOT_AREAS_VERSION + 1):
+        for name in ADDED_IN_VERSION.get(v, []):
+            if name not in names:
+                cfg["hot_areas"].append(next(dict(h) for h in DEFAULT_HOT_AREAS if h["name"] == name))
+    cfg["hot_areas_version"] = HOT_AREAS_VERSION
+    return True
 
 
 def hot_areas(cfg: dict) -> list[dict]:

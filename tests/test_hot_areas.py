@@ -51,8 +51,9 @@ class HTTP:   # Rightmove's location lookup: L15 -> OUTCODE^15 etc.
 
 def test_defaults_and_parsing(cfg):
     cfg.pop("hot_areas", None)
-    assert [(h["name"], h["area"], h["radius"]) for h in hot_areas(cfg)] == [("Wavertree", "L15", 1),
-                                                                             ("Old Swan", "L13", 1)]
+    assert [(h["name"], h["area"], h["radius"]) for h in hot_areas(cfg)] == [
+        ("Wavertree", "L15", 1), ("Old Swan", "L13", 1), ("Aintree Hospital / Longmoor Lane", "L9 7AL", 0.5),
+        ("Orrell Park", "L9 8BX", 0.5)]
     cfg["hot_areas"] = []
     assert hot_areas(cfg) == []                                   # removing them all is respected
     areas, errors = parse_hot_areas("Wavertree, l15, 1\nOld Swan, L13\nEdge Hill, l7 5ab, 0.5\nbad line")
@@ -138,3 +139,15 @@ def test_hot_areas_on_the_search_page(tmp_path, monkeypatch, cfg):
     page = client.get("/").text
     assert 'value="Edge Hill"' in page and 'value="Old Swan"' not in page
     assert "Edge Hill, L7, 0.5" in client.get("/settings").text
+
+
+def test_new_default_areas_added_once_to_a_saved_list(cfg):
+    from dealfinder.search import upgrade_hot_areas
+    cfg["hot_areas"] = [{"name": "Wavertree", "area": "L15", "radius": 3}, {"name": "Edge Hill", "area": "L7"}]
+    cfg.pop("hot_areas_version", None)
+    assert upgrade_hot_areas(cfg)
+    assert [h["name"] for h in cfg["hot_areas"]] == ["Wavertree", "Edge Hill", "Aintree Hospital / Longmoor Lane",
+                                                     "Orrell Park"]
+    assert cfg["hot_areas"][0]["radius"] == 3                     # their own settings untouched
+    cfg["hot_areas"] = cfg["hot_areas"][:2]                       # they delete the new ones later…
+    assert not upgrade_hot_areas(cfg) and len(cfg["hot_areas"]) == 2   # …and they stay deleted

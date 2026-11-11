@@ -42,6 +42,9 @@ sources:
 hot_areas:
   - {name: Wavertree, area: L15, radius: 1}
   - {name: Old Swan, area: L13, radius: 1}
+  - {name: Aintree Hospital / Longmoor Lane, area: L9 7AL, radius: 0.5}
+  - {name: Orrell Park, area: L9 8BX, radius: 0.5}
+hot_areas_version: 2
 
 valuation:
   months_back: 24
